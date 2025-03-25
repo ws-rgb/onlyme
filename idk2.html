@@ -1,0 +1,3839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Simulation with Special Blocks and Items</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            min-height: 150vh;
+            font-family: 'Arial', sans-serif;
+            background-color: #f5f5f5;
+        }
+        
+        .page-container {
+            padding: 50px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .container {
+            position: relative;
+            width: 700px;
+            height: 500px;
+            border: 2px solid rgba(0, 0, 0, 0.2);
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            cursor: crosshair;
+        }
+        
+        .frame-grid {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+            background-size: 25px 25px;
+            z-index: 1;
+        }
+        
+        .square {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            background-size: cover;
+            background-position: center;
+            cursor: move;
+            transition: width 0.3s, height 0.3s;
+        }
+        
+        .square:nth-child(2) {
+            background-image: url('red.png');
+            box-shadow: none;
+        }
+        
+        .square:nth-child(3) {
+            background-image: url('green.png');
+            box-shadow: none;
+        }
+        
+        .square:nth-child(4) {
+            background-image: url('blue.png');
+            box-shadow: none;
+        }
+        
+        .square:nth-child(5) {
+            background-image: url('yellow.png');
+            box-shadow: none;
+        }
+        
+        .square.small {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .square.exploding {
+            animation: explode 0.2s forwards;
+        }
+
+        .square.has-knife:after {
+        content: "";
+        position: absolute;
+        top: 10%;
+        right: -10px;
+        width: 15px;
+        height: 30px;
+        background-image: url('/api/placeholder/15/30');
+        background-size: contain;
+        background-position: center;
+        background-repeat: no-repeat;
+        }
+        
+        @keyframes explode {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+        
+        .obstacle {
+            position: absolute;
+            background-color: rgba(0, 195, 225, 0.8);
+            border-radius: 2px;
+            z-index: 2;
+            cursor: move;
+        }
+        
+        .obstacle.breakable {
+            background-color: rgba(150, 75, 0, 0.8);
+            border: 2px dashed rgba(255, 165, 0, 0.7);
+            box-shadow: 0 0 15px rgba(255, 140, 0, 0.6);
+        }
+
+        .obstacle.moving {
+            background-color: rgba(75, 0, 130, 0.8);
+            border: 2px solid rgba(128, 0, 128, 0.7);
+            box-shadow: 0 0 15px rgba(128, 0, 128, 0.6);
+        }
+
+        .obstacle.moving:after {
+            content: "↔";
+            position: absolute;
+            font-size: 20px;
+            color: white;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .block {
+            position: absolute;
+            z-index: 2;
+            cursor: move;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
+            background-size: cover;
+            background-position: center;
+            overflow: hidden;
+        }
+        
+        .block.teleporter {
+            background-color: rgba(75, 0, 130, 0.7);
+            background-image: url('tr.mp4');
+        }
+        
+        .block.killer {
+            background-color: rgba(200, 0, 0, 0.7);
+            background-image: url('kill.png');
+        }
+        
+        .block.transformer {
+            background-color: rgba(0, 150, 0, 0.7);
+            border: 2px solid #00FF00;
+        }
+
+        .block.finishline {
+            background-color: rgba(0, 0, 0, 0.7);
+            background-image: url('f.png');
+            border: 2px solid #FFFFFF;
+        }
+
+        .item {
+            position: absolute;
+            z-index: 2;
+            cursor: move;
+            background-size: cover;
+            background-position: center;
+            overflow: hidden;
+        }
+
+        .item.knife {
+            background-image: url('knife.png');
+        }
+        
+        .explosion-particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            z-index: 4;
+            pointer-events: none;
+        }
+        
+        .obstacle.selected, .block.selected, .item.selected {
+            border: 2px dashed white;
+            box-sizing: border-box;
+        }
+        
+        .square.selected {
+            border: 2px solid yellow;
+            box-sizing: border-box;
+        }
+        
+        .obstacle-delete, .block-delete, .item-delete, .waypoint-delete {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 20px;
+            height: 20px;
+            background-color: red;
+            color: white;
+            font-weight: bold;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 5;
+            display: none;
+        }
+        
+        .trail {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0.5;
+            z-index: 1;
+        }
+        
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        button:hover {
+            background-color: #1976D2;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        button.active {
+            background-color: #FF5722;
+        }
+        
+        .obstacle-options, .block-options, .item-options, .moving-obstacle-options {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            display: none;
+            align-items: center;
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        
+        .obstacle-options label, .block-options label, .item-options label, .moving-obstacle-options label {
+            display: inline-block;
+            margin-right: 5px;
+            font-weight: bold;
+        }
+        
+        .obstacle-options input, .obstacle-options select,
+        .block-options input, .block-options select,
+        .item-options input, .item-options select,
+        .moving-obstacle-options input, .moving-obstacle-options select {
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        
+        .collision-effect {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 3;
+            animation: pulse 0.5s ease-out;
+            opacity: 0;
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: scale(0);
+                opacity: 0.7;
+            }
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+        
+        .color-picker {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            overflow: hidden;
+        }
+        
+        .color-picker input {
+            width: 150%;
+            height: 150%;
+            margin: -5px;
+            cursor: pointer;
+        }
+        
+        .spawn-point {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 2px dashed rgba(255, 255, 255, 0.7);
+            border-radius: 4px;
+            z-index: 1;
+            background-color: rgba(255, 255, 255, 0.2);
+            display: none;
+        }
+        
+        .info-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-radius: 8px;
+            text-align: center;
+            max-width: 700px;
+        }
+        
+        .info-panel h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        
+        .block-type-selector, .item-type-selector, .obstacle-type-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .block-type-btn, .item-type-btn, .obstacle-type-btn {
+            flex: 1;
+        }
+        
+        .block-type-btn.active, .item-type-btn.active, .obstacle-type-btn.active {
+            background-color: #FF5722;
+        }
+        
+        .square-size-control {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .finish-message {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 32px;
+            font-weight: bold;
+            z-index: 10;
+            display: none;
+        }
+        
+        .moving-path-indicator {
+            position: absolute;
+            border: 2px dashed rgba(128, 0, 128, 0.7);
+            background-color: rgba(128, 0, 128, 0.1);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .waypoint {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: rgba(128, 0, 128, 0.7);
+            z-index: 2;
+            cursor: move;
+        }
+
+        .breakable-pieces {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: rgba(150, 75, 0, 0.8);
+            z-index: 2;
+            pointer-events: none;
+            border-radius: 2px;
+        }
+        
+        .extra-content {
+            margin-top: 50px;
+            padding: 20px;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            max-width: 700px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-container">
+        <div class="container" id="frame">
+            <div class="frame-grid"></div>
+            <div class="obstacle" id="obstacle"></div>
+            <div class="square" id="square1"></div>
+            <div class="square" id="square2"></div>
+            <div class="square" id="square3"></div>
+            <div class="square" id="square4"></div>
+            <div class="spawn-point" id="spawn1"></div>
+            <div class="spawn-point" id="spawn2"></div>
+            <div class="spawn-point" id="spawn3"></div>
+            <div class="spawn-point" id="spawn4"></div>
+            <div class="finish-message" id="finishMessage">FINISH!</div>
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn">Start</button>
+            <button id="stopBtn">Stop</button>
+            <button id="resetBtn">Reset</button>
+            <button id="addObstacleBtn">Add Obstacle</button>
+            <button id="addBlockBtn">Add Block</button>
+            <button id="addItemBtn">Add Item</button>
+            <button id="clearAllBtn">Clear All</button>
+        </div>
+        
+        <div class="square-size-control">
+            <label>Square Size:</label>
+            <button id="normalSizeBtn" class="active">Normal (40px)</button>
+            <button id="smallSizeBtn">Small (20px)</button>
+        </div>
+        
+        <div class="obstacle-options" id="obstacleOptions">
+            <div>
+                <label>Obstacle Type:</label>
+                <div class="obstacle-type-selector">
+                    <button id="normalObstacleBtn" class="obstacle-type-btn active">Normal</button>
+                    <button id="breakableObstacleBtn" class="obstacle-type-btn">Breakable</button>
+                    <button id="movingObstacleBtn" class="obstacle-type-btn">Moving</button>
+                </div>
+            </div>
+            <div>
+                <label>Width:</label>
+                <input type="number" id="obstacleWidth" min="10" max="200" value="70" style="width:60px">
+            </div>
+            <div>
+                <label>Height:</label>
+                <input type="number" id="obstacleHeight" min="10" max="200" value="10" style="width:60px">
+            </div>
+            <div>
+                <label>Color:</label>
+                <div class="color-picker">
+                    <input type="color" id="obstacleColor" value="#000000">
+                </div>
+            </div>
+            <div>
+                <label>Opacity:</label>
+                <input type="range" id="obstacleOpacity" min="0.1" max="1" step="0.1" value="0.8" style="width:100px">
+            </div>
+            <div>
+                <label>Shape:</label>
+                <select id="obstacleShape">
+                    <option value="rectangle">Rectangle</option>
+                    <option value="circle">Circle</option>
+                </select>
+            </div>
+            <div id="breakableOptionDiv" style="display:none;">
+                <label>Durability:</label>
+                <input type="number" id="obstacleDurability" min="1" max="10" value="3" style="width:60px">
+            </div>
+        </div>
+        
+        <div class="moving-obstacle-options" id="movingObstacleOptions">
+            <div>
+                <label>Movement:</label>
+                <select id="movementType">
+                    <option value="linear">Linear</option>
+                    <option value="circular">Circular</option>
+                </select>
+            </div>
+            <div>
+                <label>Speed:</label>
+                <input type="range" id="movingSpeed" min="1" max="10" value="3" style="width:100px">
+            </div>
+            <div id="waypointInfo">
+                Click on the game area to set movement waypoints
+            </div>
+        </div>
+        
+        <div class="block-options" id="blockOptions">
+            <div>
+                <label>Block Type:</label>
+                <div class="block-type-selector">
+                    <button id="teleporterBtn" class="block-type-btn active">Teleporter</button>
+                    <button id="killerBtn" class="block-type-btn">Killer</button>
+                    <button id="transformerBtn" class="block-type-btn">Transformer</button>
+                    <button id="finishlineBtn" class="block-type-btn">Finish Line</button>
+                </div>
+            </div>
+            <div>
+                <label>Width:</label>
+                <input type="number" id="blockWidth" min="10" max="200" value="50" style="width:60px">
+            </div>
+            <div>
+                <label>Height:</label>
+                <input type="number" id="blockHeight" min="10" max="200" value="50" style="width:60px">
+            </div>
+        </div>
+
+        <div class="item-options" id="itemOptions">
+            <div>
+                <label>Item Type:</label>
+                <div class="item-type-selector">
+                    <button id="knifeBtn" class="item-type-btn active">Knife</button>
+                </div>
+            </div>
+            <div>
+                <label>Size:</label>
+                <input type="number" id="itemSize" min="10" max="100" value="30" style="width:60px">
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <h3>Controls</h3>
+            <p><strong>Mouse:</strong> Click and drag objects • Scroll to resize selected objects</p>
+            <p><strong>Keys 1-4:</strong> Select squares • <strong>Tab:</strong> Cycle through objects</p>
+            <p><strong>Arrow Keys:</strong> Move selected objects • <strong>S:</strong> Return square to spawn</p>
+            <p><strong>Delete/Backspace:</strong> Remove selected object</p>
+            <p id="selection-status">No object selected</p>
+        </div>
+    </div>
+
+    <script>
+        // Constants
+        const DIRECTIONS = [
+            { x: 1, y: -1 },  // 45 degrees
+            { x: 1, y: -1 }, // 135 degrees
+            { x: 1, y: -1 },  // 225 degrees
+            { x: 1, y: -1 }    // 315 degrees
+        ];
+        
+        const SPEED = 2;
+        const TRAIL_LIFETIME = 800; // ms
+        const TRAIL_SPAWN_RATE = 4; // frames
+        const MOVE_SPEED = 10; // pixels per keypress
+        const SCROLL_RESIZE_AMOUNT = 5; // pixels per scroll event
+        const SCROLL_RESIZE_AMOUNT_FINE = 1; // pixels for fine control with Shift
+        const NORMAL_SQUARE_SIZE = 40;
+        const SMALL_SQUARE_SIZE = 20;
+        const EXPLOSION_PARTICLES = 15; // Reduced number of particles to prevent lag
+        const EXPLOSION_DURATION = 800; // ms
+        const KNIFE_SIZE = 30; // default knife size
+        const BREAKABLE_PIECES = 12; // number of pieces when obstacle breaks
+        const PRESSURE_CHECK_INTERVAL = 100; // ms to check for square pressure
+        const KNIFE_PICKUP_COOLDOWN = 1000; // 1 second cooldown in milliseconds
+        
+        // Elements
+        const frame = document.getElementById('frame');
+        const initialObstacle = document.getElementById('obstacle');
+        const squares = [
+            document.getElementById('square1'),
+            document.getElementById('square2'),
+            document.getElementById('square3'),
+            document.getElementById('square4')
+        ];
+        
+        const spawnPoints = [
+            document.getElementById('spawn1'),
+            document.getElementById('spawn2'),
+            document.getElementById('spawn3'),
+            document.getElementById('spawn4')
+        ];
+
+        const finishMessage = document.getElementById('finishMessage');
+        
+        const selectionStatus = document.getElementById('selection-status');
+        
+        // Ensure initial square visibility
+        squares.forEach(square => {
+            square.style.display = 'block';
+            square.style.opacity = '1';
+            square.style.width = NORMAL_SQUARE_SIZE + 'px';
+            square.style.height = NORMAL_SQUARE_SIZE + 'px';
+        });
+        
+        // Buttons and controls
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const addObstacleBtn = document.getElementById('addObstacleBtn');
+        const addBlockBtn = document.getElementById('addBlockBtn');
+        const addItemBtn = document.getElementById('addItemBtn');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const normalSizeBtn = document.getElementById('normalSizeBtn');
+        const smallSizeBtn = document.getElementById('smallSizeBtn');
+        
+        // Obstacle customization controls
+        const obstacleOptions = document.getElementById('obstacleOptions');
+        const obstacleWidthInput = document.getElementById('obstacleWidth');
+        const obstacleHeightInput = document.getElementById('obstacleHeight');
+        const obstacleColorInput = document.getElementById('obstacleColor');
+        const obstacleOpacityInput = document.getElementById('obstacleOpacity');
+        const obstacleShapeInput = document.getElementById('obstacleShape');
+        const obstacleDurabilityInput = document.getElementById('obstacleDurability');
+        const normalObstacleBtn = document.getElementById('normalObstacleBtn');
+        const breakableObstacleBtn = document.getElementById('breakableObstacleBtn');
+        const movingObstacleBtn = document.getElementById('movingObstacleBtn');
+        const breakableOptionDiv = document.getElementById('breakableOptionDiv');
+
+        // Moving obstacle options
+        const movingObstacleOptions = document.getElementById('movingObstacleOptions');
+        const movementTypeInput = document.getElementById('movementType');
+        const movingSpeedInput = document.getElementById('movingSpeed');
+        
+        // Block customization controls
+        const blockOptions = document.getElementById('blockOptions');
+        const blockWidthInput = document.getElementById('blockWidth');
+        const blockHeightInput = document.getElementById('blockHeight');
+        const teleporterBtn = document.getElementById('teleporterBtn');
+        const killerBtn = document.getElementById('killerBtn');
+        const transformerBtn = document.getElementById('transformerBtn');
+        const finishlineBtn = document.getElementById('finishlineBtn');
+
+        // Item customization controls
+        const itemOptions = document.getElementById('itemOptions');
+        const itemSizeInput = document.getElementById('itemSize');
+        const knifeBtn = document.getElementById('knifeBtn');
+        
+        // Animation state
+        let animationId = null;
+        let frameCount = 0;
+        let isAddingObstacle = false;
+        let isAddingBlock = false;
+        let isAddingItem = false;
+        let isAddingMovingObstacle = false;
+        let selectedObstacle = null;
+        let selectedBlock = null;
+        let selectedItem = null;
+        let selectedSquare = null;
+        let selectedSquareIndex = null;
+        let selectedWaypoint = null;
+        let isDragging = false;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+        let currentObstacleType = 'normal';
+        let currentBlockType = 'teleporter';
+        let currentItemType = 'knife';
+        let currentMovementType = 'linear';
+        let squareSize = NORMAL_SQUARE_SIZE;
+        let isGameFinished = false;
+        let pressureCheckTimer = null;
+        
+        // For moving obstacles
+        let currentMovingObstacle = null;
+        let movingWaypoints = [];
+        let isSettingWaypoints = false;
+        let pathIndicator = null;
+        
+        // Define square images and shadow colors
+        const squareImages = [
+            { url: 'red.png', knifeUrl: 'red-knife.png', shadow: 'rgba(255, 0, 0, 0.8)' },
+            { url: 'green.png', knifeUrl: 'green-knife.png', shadow: 'rgba(17, 239, 255, 0.8)' },
+            { url: 'blue.png', knifeUrl: 'blue-knife.png', shadow: 'rgba(33, 150, 243, 0.8)' },
+            { url: 'yellow.png', knifeUrl: 'yellow-knife.png', shadow: 'rgba(255, 193, 7, 0.8)' }
+        ];
+        
+        // Define spawn positions
+        const spawnPositions = [
+            { x: 50, y: 50 },
+            { x: 150, y: 150 },
+            { x: 250, y: 250 },
+            { x: 350, y: 350 }
+        ];
+        
+        // Square state objects
+        const squareStates = squares.map((square, index) => {
+            return {
+                element: square,
+                x: spawnPositions[index].x,
+                y: spawnPositions[index].y,
+                width: NORMAL_SQUARE_SIZE,
+                height: NORMAL_SQUARE_SIZE,
+                direction: DIRECTIONS[index % DIRECTIONS.length],
+                speed: SPEED,
+                image: squareImages[index].url,
+                knifeImage: squareImages[index].knifeUrl,
+                shadow: squareImages[index].shadow,
+                spawnX: spawnPositions[index].x,
+                spawnY: spawnPositions[index].y,
+                isSmall: false,
+                isExploding: false,
+                isKilled: false,
+                hasKnife: false,
+                teleportCooldown: 0,
+                knifePickupCooldown: 0
+            };
+        });
+        
+        // Setup spawn points
+        spawnPoints.forEach((spawn, index) => {
+            spawn.style.left = spawnPositions[index].x + 'px';
+            spawn.style.top = spawnPositions[index].y + 'px';
+            spawn.style.width = NORMAL_SQUARE_SIZE + 'px';
+            spawn.style.height = NORMAL_SQUARE_SIZE + 'px';
+        });
+        
+        // Obstacles array
+        let obstacles = [];
+        
+        // Blocks array
+        let blocks = [];
+
+        // Items array
+        let items = [];
+        
+        // Initialize initial obstacle
+        initialObstacle.style.left = (frame.clientWidth / 2 - 35) + 'px';
+        initialObstacle.style.top = (frame.clientHeight / 2 - 5) + 'px';
+        initialObstacle.style.width = '70px';
+        initialObstacle.style.height = '10px';
+        
+        // Add to obstacles array
+        obstacles.push({
+            element: initialObstacle,
+            x: frame.clientWidth / 2 - 35,
+            y: frame.clientHeight / 2 - 5,
+            width: 70,
+            height: 10,
+            shape: 'rectangle',
+            color: 'rgba(0, 0, 0, 0.8)',
+            type: 'normal',
+            durability: 3,
+            moving: false
+        });
+        
+        // Update selection status text
+        function updateSelectionStatus() {
+            if (selectedSquare) {
+                selectionStatus.textContent = `Square ${selectedSquareIndex + 1} selected`;
+            } else if (selectedObstacle) {
+                const obstacleIndex = obstacles.indexOf(selectedObstacle);
+                selectionStatus.textContent = `Obstacle ${obstacleIndex + 1} selected`;
+            } else if (selectedBlock) {
+                const blockIndex = blocks.indexOf(selectedBlock);
+                selectionStatus.textContent = `${selectedBlock.type.charAt(0).toUpperCase() + selectedBlock.type.slice(1)} Block ${blockIndex + 1} selected`;
+            } else if (selectedItem) {
+                const itemIndex = items.indexOf(selectedItem);
+                selectionStatus.textContent = `${selectedItem.type.charAt(0).toUpperCase() + selectedItem.type.slice(1)} Item ${itemIndex + 1} selected`;
+            } else if (selectedWaypoint) {
+                const waypointIndex = movingWaypoints.indexOf(selectedWaypoint);
+                selectionStatus.textContent = `Waypoint ${waypointIndex + 1} selected`;
+            } else {
+                selectionStatus.textContent = 'No object selected';
+            }
+        }
+        
+        // Initialize squares
+        function initializeSquares() {
+            isGameFinished = false;
+            finishMessage.style.display = 'none';
+            
+            squareStates.forEach((state, index) => {
+                state.x = state.spawnX;
+                state.y = state.spawnY;
+                state.direction = DIRECTIONS[index % DIRECTIONS.length];
+                state.isSmall = squareSize === SMALL_SQUARE_SIZE;
+                state.width = squareSize;
+                state.height = squareSize;
+                state.isExploding = false;
+                state.isKilled = false;
+                state.hasKnife = false;
+                state.teleportCooldown = 0;
+                state.knifePickupCooldown = 0;
+                
+                updateSquarePosition(state);
+                updateSquareSize(state);
+                
+                // Remove small class if needed
+                if (!state.isSmall) {
+                    state.element.classList.remove('small');
+                } else {
+                    state.element.classList.add('small');
+                }
+
+                // Remove knife class
+                state.element.classList.remove('has-knife');
+                
+                // Apply default image and shadow
+                state.element.style.backgroundImage = `url(${state.image})`;
+                state.element.style.boxShadow = `none`;
+                
+                // Ensure visibility
+                state.element.style.display = 'block';
+                state.element.style.opacity = '1';
+                state.element.classList.remove('exploding');
+            });
+            
+            // Update spawn point sizes
+            spawnPoints.forEach(spawn => {
+                spawn.style.width = squareSize + 'px';
+                spawn.style.height = squareSize + 'px';
+            });
+            
+            // Clear trails
+            const trails = document.querySelectorAll('.trail');
+            trails.forEach(trail => trail.remove());
+            
+            // Clear collision effects
+            const effects = document.querySelectorAll('.collision-effect');
+            effects.forEach(effect => effect.remove());
+            
+            // Clear explosion particles
+            const particles = document.querySelectorAll('.explosion-particle');
+            particles.forEach(particle => particle.remove());
+            
+            // Hide spawn points
+            spawnPoints.forEach(spawn => {
+                spawn.style.display = 'none';
+            });
+        }
+        
+        // This function explicitly moves all squares to their spawn points
+        function moveSquaresToSpawn() {
+            squareStates.forEach(state => {
+                state.x = state.spawnX;
+                state.y = state.spawnY;
+                updateSquarePosition(state);
+            });
+        }
+        
+        // Update square position
+        function updateSquarePosition(state) {
+            state.element.style.left = state.x + 'px';
+            state.element.style.top = state.y + 'px';
+        }
+        
+        // Update square size
+        function updateSquareSize(state) {
+            state.element.style.width = state.width + 'px';
+            state.element.style.height = state.height + 'px';
+        }
+        
+        // Update obstacle position
+        function updateObstaclePosition(obstacle) {
+            obstacle.element.style.left = obstacle.x + 'px';
+            obstacle.element.style.top = obstacle.y + 'px';
+        }
+        
+        // Update obstacle size
+        function updateObstacleSize(obstacle) {
+            obstacle.element.style.width = obstacle.width + 'px';
+            obstacle.element.style.height = obstacle.height + 'px';
+            
+            // Update circle shape if needed
+            if (obstacle.shape === 'circle') {
+                obstacle.element.style.borderRadius = '50%';
+            }
+        }
+        
+        // Update block position
+        function updateBlockPosition(block) {
+            block.element.style.left = block.x + 'px';
+            block.element.style.top = block.y + 'px';
+        }
+        
+        // Update block size
+        function updateBlockSize(block) {
+            block.element.style.width = block.width + 'px';
+            block.element.style.height = block.height + 'px';
+        }
+
+        // Update item position
+        function updateItemPosition(item) {
+            item.element.style.left = item.x + 'px';
+            item.element.style.top = item.y + 'px';
+        }
+        
+        // Update item size
+        function updateItemSize(item) {
+            item.element.style.width = item.size + 'px';
+            item.element.style.height = item.size + 'px';
+        }
+        
+        // Create particle trail
+        function createTrail(state) {
+            if (frameCount % TRAIL_SPAWN_RATE !== 0 || state.isExploding || state.isKilled) return;
+            
+            const trail = document.createElement('div');
+            trail.classList.add('trail');
+            
+            // Position at the center of the square
+            const trailSize = 5 + Math.random() * 10;
+            trail.style.width = `${trailSize}px`;
+            trail.style.height = `${trailSize}px`;
+            trail.style.left = `${state.x + state.width/2 - trailSize/2}px`;
+            trail.style.top = `${state.y + state.height/2 - trailSize/2}px`;
+            
+            // Use the square's shadow color
+            trail.style.backgroundColor = state.shadow;
+            trail.style.boxShadow = `0 0 10px ${state.shadow}`;
+            
+            // Add to frame
+            frame.appendChild(trail);
+            
+            // Fade out and remove
+            setTimeout(() => {
+                trail.style.transition = 'all 0.5s ease';
+                trail.style.opacity = '0';
+                trail.style.transform = 'scale(0.5)';
+                
+                setTimeout(() => {
+                    if (trail.parentNode) {
+                        trail.parentNode.removeChild(trail);
+                    }
+                }, 500);
+            }, TRAIL_LIFETIME * Math.random());
+        }
+        
+        // Create explosion effect
+        function createExplosion(square) {
+            // Mark square as exploding
+            square.isExploding = true;
+            square.element.classList.add('exploding');
+            
+            // Create explosion particles
+            const colors = [
+                square.shadow,
+                '#FF4500',
+                '#FFD700',
+                '#FF8C00'
+            ];
+            
+            for (let i = 0; i < EXPLOSION_PARTICLES; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('explosion-particle');
+                
+                // Position at square center
+                const centerX = square.x + square.width / 2;
+                const centerY = square.y + square.height / 2;
+                
+                particle.style.left = `${centerX}px`;
+                particle.style.top = `${centerY}px`;
+                
+                // Random particle color
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                particle.style.backgroundColor = color;
+                particle.style.boxShadow = `0 0 5px ${color}`;
+                
+                // Random direction and speed
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1 + Math.random() * 5;
+                const dx = Math.cos(angle) * speed;
+                const dy = Math.sin(angle) * speed;
+                
+                // Add to frame
+                frame.appendChild(particle);
+                
+                // Animate particles
+                let posX = centerX;
+                let posY = centerY;
+                let opacity = 1;
+                let particleSize = 2 + Math.random() * 4;
+                
+                const animateParticle = () => {
+                    posX += dx;
+                    posY += dy;
+                    opacity -= 0.03; // Faster fade out to reduce CPU load
+                    particleSize *= 0.97;
+                    
+                    particle.style.left = `${posX - particleSize/2}px`;
+                    particle.style.top = `${posY - particleSize/2}px`;
+                    particle.style.opacity = opacity;
+                    particle.style.width = `${particleSize}px`;
+                    particle.style.height = `${particleSize}px`;
+                    
+                    if (opacity > 0.05) {
+                        requestAnimationFrame(animateParticle);
+                    } else {
+                        particle.remove();
+                    }
+                };
+                
+                requestAnimationFrame(animateParticle);
+            }
+            
+            // Hide square after explosion
+            setTimeout(() => {
+                // Mark square as killed
+                square.isKilled = true;
+                square.isExploding = false;
+                square.element.classList.remove('exploding');
+                
+                // If it had a knife, drop it
+                if (square.hasKnife) {
+                    // Create a new knife item at the square's position
+                    const knifeSize = parseInt(itemSizeInput.value) || KNIFE_SIZE;
+                    createItem(
+                        square.x + (square.width / 2) - (knifeSize / 2),
+                        square.y + (square.height / 2) - (knifeSize / 2),
+                        'knife',
+                        knifeSize
+                    );
+                    square.hasKnife = false;
+                    square.element.classList.remove('has-knife');
+                }
+                
+                // Hide the square
+                square.element.style.display = 'none';
+            }, 500);
+        }
+        // Break an obstacle when it gets hit
+       function breakObstacle(obstacle, collisionX, collisionY) {
+           // Decrease durability
+           obstacle.durability--;
+           
+           // Get current durability
+           const durability = obstacle.durability;
+           
+           // Create hit effect
+           const effect = document.createElement('div');
+           effect.classList.add('collision-effect');
+           effect.style.left = `${collisionX - 25}px`;
+           effect.style.top = `${collisionY - 25}px`;
+           effect.style.backgroundColor = 'rgba(255, 165, 0, 0.5)';
+           effect.style.boxShadow = '0 0 20px rgba(255, 140, 0, 0.8)';
+           frame.appendChild(effect);
+           
+           // If durability is zero, break the obstacle
+           if (durability <= 0) {
+               // Create breaking pieces effect
+               for (let i = 0; i < BREAKABLE_PIECES; i++) {
+                   const piece = document.createElement('div');
+                   piece.classList.add('breakable-pieces');
+                   
+                   // Position randomly within the obstacle
+                   const pieceX = obstacle.x + Math.random() * obstacle.width;
+                   const pieceY = obstacle.y + Math.random() * obstacle.height;
+                   
+                   piece.style.left = `${pieceX}px`;
+                   piece.style.top = `${pieceY}px`;
+                   
+                   // Random rotation
+                   piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+                   
+                   // Add to frame
+                   frame.appendChild(piece);
+                   
+                   // Random direction and speed
+                   const angle = Math.random() * Math.PI * 2;
+                   const speed = 1 + Math.random() * 3;
+                   const dx = Math.cos(angle) * speed;
+                   const dy = Math.sin(angle) * speed;
+                   
+                   // Animate pieces
+                   let posX = pieceX;
+                   let posY = pieceY;
+                   let opacity = 1;
+                   let pieceSize = 5 + Math.random() * 5;
+                   
+                   const animatePiece = () => {
+                       posX += dx;
+                       posY += dy;
+                       opacity -= 0.02;
+                       
+                       piece.style.left = `${posX}px`;
+                       piece.style.top = `${posY}px`;
+                       piece.style.opacity = opacity;
+                       
+                       if (opacity > 0.1) {
+                           requestAnimationFrame(animatePiece);
+                       } else {
+                           piece.remove();
+                       }
+                   };
+                   
+                   requestAnimationFrame(animatePiece);
+               }
+               
+               // Remove the obstacle
+               const index = obstacles.indexOf(obstacle);
+               if (index > -1) {
+                   obstacle.element.remove();
+                   obstacles.splice(index, 1);
+               }
+               
+               // Clear selection if this was the selected obstacle
+               if (selectedObstacle === obstacle) {
+                   selectedObstacle = null;
+                   updateSelectionStatus();
+               }
+           } else {
+               // Update the data attribute
+               obstacle.element.setAttribute('data-durability', durability);
+               
+               // Visual feedback that the obstacle is damaged
+               obstacle.element.style.opacity = 0.5 + (durability / 10) * 0.5;
+           }
+       }
+       
+       // Teleport square to another teleporter
+       function teleportSquare(square, sourceBlock) {
+           if (square.teleportCooldown > 0) return;
+
+           // Find other teleporters
+           const otherTeleporters = blocks.filter(block => 
+               block.type === 'teleporter' && block !== sourceBlock
+           );
+           
+           // If no other teleporter, create a random position
+           if (otherTeleporters.length === 0) {
+               // Apply teleport cooldown
+               square.teleportCooldown = 30; // frames
+               
+               // Create teleport flash effect
+               const flash = document.createElement('div');
+               flash.classList.add('collision-effect');
+               flash.style.left = `${square.x + square.width/2 - 25}px`;
+               flash.style.top = `${square.y + square.height/2 - 25}px`;
+               flash.style.backgroundColor = 'rgba(75, 0, 130, 0.7)';
+               flash.style.boxShadow = '0 0 30px #800080';
+               frame.appendChild(flash);
+               
+               // Find new valid position
+               let newX, newY;
+               let attempts = 0;
+               do {
+                   newX = Math.random() * (frame.clientWidth - square.width);
+                   newY = Math.random() * (frame.clientHeight - square.width);
+                   attempts++;
+               } while (isPositionObstructed(newX, newY, square.width, square.height) && attempts < 10);
+               
+               // If all attempts failed, find any valid position
+               if (attempts >= 10) {
+                   newX = 50;
+                   newY = 50;
+               }
+               
+               // Move square to new position
+               square.x = newX;
+               square.y = newY;
+               updateSquarePosition(square);
+               
+               // Create arrival flash effect
+               const arrivalFlash = document.createElement('div');
+               arrivalFlash.classList.add('collision-effect');
+               arrivalFlash.style.left = `${square.x + square.width/2 - 25}px`;
+               arrivalFlash.style.top = `${square.y + square.height/2 - 25}px`;
+               arrivalFlash.style.backgroundColor = 'rgba(75, 0, 130, 0.7)';
+               arrivalFlash.style.boxShadow = '0 0 30px #800080';
+               frame.appendChild(arrivalFlash);
+           } else {
+               // Choose a random teleporter
+               const targetTeleporter = otherTeleporters[Math.floor(Math.random() * otherTeleporters.length)];
+               
+               // Apply teleport cooldown
+               square.teleportCooldown = 30; // frames
+               
+               // Create teleport flash effect
+               const flash = document.createElement('div');
+               flash.classList.add('collision-effect');
+               flash.style.left = `${square.x + square.width/2 - 25}px`;
+               flash.style.top = `${square.y + square.height/2 - 25}px`;
+               flash.style.backgroundColor = 'rgba(75, 0, 130, 0.7)';
+               flash.style.boxShadow = '0 0 30px #800080';
+               frame.appendChild(flash);
+               
+               // Calculate position near the target teleporter
+               const newX = targetTeleporter.x + (targetTeleporter.width / 2) - (square.width / 2);
+               const newY = targetTeleporter.y + targetTeleporter.height;
+               
+               // Move square to new position
+               square.x = newX;
+               square.y = newY;
+               updateSquarePosition(square);
+               
+               // Create arrival flash effect
+               const arrivalFlash = document.createElement('div');
+               arrivalFlash.classList.add('collision-effect');
+               arrivalFlash.style.left = `${square.x + square.width/2 - 25}px`;
+               arrivalFlash.style.top = `${square.y + square.height/2 - 25}px`;
+               arrivalFlash.style.backgroundColor = 'rgba(75, 0, 130, 0.7)';
+               arrivalFlash.style.boxShadow = '0 0 30px #800080';
+               frame.appendChild(arrivalFlash);
+           }
+       }
+       
+       // Transform square size
+       function transformSquare(square) {
+           // Toggle size
+           square.isSmall = !square.isSmall;
+           
+           // Update size
+           if (square.isSmall) {
+               square.width = SMALL_SQUARE_SIZE;
+               square.height = SMALL_SQUARE_SIZE;
+               square.element.classList.add('small');
+           } else {
+               square.width = NORMAL_SQUARE_SIZE;
+               square.height = NORMAL_SQUARE_SIZE;
+               square.element.classList.remove('small');
+           }
+           
+           // Update DOM
+           updateSquareSize(square);
+           
+           // Create transform effect
+           const effect = document.createElement('div');
+           effect.classList.add('collision-effect');
+           effect.style.left = `${square.x + square.width/2 - 25}px`;
+           effect.style.top = `${square.y + square.height/2 - 25}px`;
+           effect.style.backgroundColor = 'rgba(0, 150, 0, 0.7)';
+           effect.style.boxShadow = '0 0 30px #00FF00';
+           frame.appendChild(effect);
+       }
+
+       // Give knife to a square
+       function giveKnife(square, knifeItem) {
+           // Add knife to square
+           square.hasKnife = true;
+           square.element.classList.add('has-knife');
+           
+           // Change square size if needed based on square size
+           if (square.isSmall) {
+               // Small square: change from 20x20 to 30x20
+               square.width = 30;
+               square.height = 20;
+           } else {
+               // Normal square: change from 40x40 to 60x40
+               square.width = 60; 
+               square.height = 40;
+           }
+           
+           // Update image to knife version
+           square.element.style.backgroundImage = `url(${square.knifeImage})`;
+           
+           // Update square size
+           updateSquareSize(square);
+           
+           // Remove knife item
+           const itemIndex = items.indexOf(knifeItem);
+           if (itemIndex > -1) {
+               knifeItem.element.remove();
+               items.splice(itemIndex, 1);
+           }
+           
+           // Create pickup effect
+           const effect = document.createElement('div');
+           effect.classList.add('collision-effect');
+           effect.style.left = `${square.x + square.width/2 - 25}px`;
+           effect.style.top = `${square.y + square.height/2 - 25}px`;
+           effect.style.backgroundColor = 'rgba(180, 180, 180, 0.7)';
+           effect.style.boxShadow = '0 0 30px #808080';
+           frame.appendChild(effect);
+       }
+       // Show finish message
+       function showFinish() {
+           if (isGameFinished) return;
+           
+           isGameFinished = true;
+           
+           // Stop animation after a small delay to show effect
+           setTimeout(() => {
+               if (animationId) {
+                   cancelAnimationFrame(animationId);
+                   animationId = null;
+               }
+               
+               // Show finish message
+               finishMessage.style.display = 'flex';
+           }, 200);
+       }
+       
+       // Create collision effect
+       function createCollisionEffect(x, y, color1, color2) {
+           const effect = document.createElement('div');
+           effect.classList.add('collision-effect');
+           
+           effect.style.left = `${x - 25}px`;
+           effect.style.top = `${y - 25}px`;
+           
+           // Blend the two colors
+           effect.style.backgroundColor = color1;
+           effect.style.boxShadow = `0 0 20px ${color2}`;
+           
+           frame.appendChild(effect);
+           
+           // Remove after animation completes
+           setTimeout(() => {
+               if (effect.parentNode) {
+                   effect.parentNode.removeChild(effect);
+               }
+           }, 500);
+       }
+       
+       // Check if a position is obstructed by obstacles or blocks
+       function isPositionObstructed(x, y, width, height) {
+           // Check obstacles
+           for (const obstacle of obstacles) {
+               if (x < obstacle.x + obstacle.width &&
+                   x + width > obstacle.x &&
+                   y < obstacle.y + obstacle.height &&
+                   y + height > obstacle.y) {
+                   return true;
+               }
+           }
+           
+           // Check blocks
+           for (const block of blocks) {
+               if (x < block.x + block.width &&
+                   x + width > block.x &&
+                   y < block.y + block.height &&
+                   y + height > block.y) {
+                   return true;
+               }
+           }
+
+           // Check items
+           for (const item of items) {
+               if (x < item.x + item.size &&
+                   x + width > item.x &&
+                   y < item.y + item.size &&
+                   y + height > item.y) {
+                   return true;
+               }
+           }
+           
+           return false;
+       }
+
+       // Check for square being trapped (crushed) between obstacles
+       function checkSquareTrapped() {
+           squareStates.forEach(square => {
+               if (square.isExploding || square.isKilled) return;
+               
+               // Check if square is caught between obstacles or walls
+               let isTrapped = false;
+               let isLeftBlocked = false;
+               let isRightBlocked = false;
+               let isTopBlocked = false;
+               let isBottomBlocked = false;
+               
+               // Check each side for obstruction
+               // Left side
+               obstacles.forEach(obstacle => {
+                   // Skip if obstacle is breakable and already at low durability
+                   if (obstacle.type === 'breakable' && obstacle.durability <= 1) return;
+                   
+                   if (square.x <= obstacle.x + obstacle.width + 2 && 
+                       square.x >= obstacle.x + obstacle.width - 2 &&
+                       square.y + square.height >= obstacle.y &&
+                       square.y <= obstacle.y + obstacle.height) {
+                       isLeftBlocked = true;
+                   }
+               });
+               
+               // Right side
+               obstacles.forEach(obstacle => {
+                   // Skip if obstacle is breakable and already at low durability
+                   if (obstacle.type === 'breakable' && obstacle.durability <= 1) return;
+                   
+                   if (square.x + square.width >= obstacle.x - 2 && 
+                       square.x + square.width <= obstacle.x + 2 &&
+                       square.y + square.height >= obstacle.y &&
+                       square.y <= obstacle.y + obstacle.height) {
+                       isRightBlocked = true;
+                   }
+               });
+               
+               // Top side
+               obstacles.forEach(obstacle => {
+                   // Skip if obstacle is breakable and already at low durability
+                   if (obstacle.type === 'breakable' && obstacle.durability <= 1) return;
+                   
+                   if (square.y <= obstacle.y + obstacle.height + 2 && 
+                       square.y >= obstacle.y + obstacle.height - 2 &&
+                       square.x + square.width >= obstacle.x &&
+                       square.x <= obstacle.x + obstacle.width) {
+                       isTopBlocked = true;
+                   }
+               });
+               
+               // Bottom side
+               obstacles.forEach(obstacle => {
+                   // Skip if obstacle is breakable and already at low durability
+                   if (obstacle.type === 'breakable' && obstacle.durability <= 1) return;
+                   
+                   if (square.y + square.height >= obstacle.y - 2 && 
+                       square.y + square.height <= obstacle.y + 2 &&
+                       square.x + square.width >= obstacle.x &&
+                       square.x <= obstacle.x + obstacle.width) {
+                       isBottomBlocked = true;
+                   }
+               });
+               
+               // Also check frame boundaries
+               if (square.x <= 0) isLeftBlocked = true;
+               if (square.x + square.width >= frame.clientWidth) isRightBlocked = true;
+               if (square.y <= 0) isTopBlocked = true;
+               if (square.y + square.height >= frame.clientHeight) isBottomBlocked = true;
+               
+               // Check if trapped horizontally or vertically
+               if ((isLeftBlocked && isRightBlocked) || (isTopBlocked && isBottomBlocked)) {
+                   isTrapped = true;
+               }
+               
+               // If trapped, explode the square
+               if (isTrapped) {
+                   createExplosion(square);
+               }
+           });
+       }
+
+       // Update position of moving obstacles
+       function updateMovingObstacles() {
+           obstacles.forEach(obstacle => {
+               if (obstacle.moving && obstacle.waypoints && obstacle.waypoints.length > 1) {
+                   const waypoints = obstacle.waypoints;
+                   const speed = obstacle.speed * 0.02;
+                   
+                   if (obstacle.movementType === 'linear') {
+                       // Linear movement between waypoints
+                       const currentIndex = obstacle.currentWaypoint || 0;
+                       const nextIndex = (currentIndex + 1) % waypoints.length;
+                       
+                       const startPoint = waypoints[currentIndex];
+                       const endPoint = waypoints[nextIndex];
+                       
+                       // Update progress
+                       obstacle.progress = (obstacle.progress || 0) + speed;
+                       
+                       if (obstacle.progress >= 1) {
+                           // Move to next waypoint
+                           obstacle.currentWaypoint = nextIndex;
+                           obstacle.progress = 0;
+                       } else {
+                           // Interpolate position
+                           const newX = startPoint.x + (endPoint.x - startPoint.x) * obstacle.progress;
+                           const newY = startPoint.y + (endPoint.y - startPoint.y) * obstacle.progress;
+                           
+                           // Update position
+                           obstacle.x = newX;
+                           obstacle.y = newY;
+                           
+                           // Update DOM
+                           updateObstaclePosition(obstacle);
+                       }
+                   } else if (obstacle.movementType === 'circular') {
+                       // Circular movement using waypoints as radius control points
+                       const center = {
+                           x: 0,
+                           y: 0
+                       };
+                       
+                       // Calculate center as average of all waypoints
+                       waypoints.forEach(wp => {
+                           center.x += wp.x;
+                           center.y += wp.y;
+                       });
+                       
+                       center.x /= waypoints.length;
+                       center.y /= waypoints.length;
+                       
+                       // Calculate radius as average distance to center
+                       let radius = 0;
+                       waypoints.forEach(wp => {
+                           const dx = wp.x - center.x;
+                           const dy = wp.y - center.y;
+                           radius += Math.sqrt(dx * dx + dy * dy);
+                       });
+                       
+                       radius /= waypoints.length;
+                       
+                       // Update angle
+                       obstacle.angle = (obstacle.angle || 0) + speed;
+                       
+                       // Calculate new position
+                       const newX = center.x + Math.cos(obstacle.angle) * radius;
+                       const newY = center.y + Math.sin(obstacle.angle) * radius;
+                       
+                       // Update position
+                       obstacle.x = newX;
+                       obstacle.y = newY;
+                       
+                       // Update DOM
+                       updateObstaclePosition(obstacle);
+                   }
+               }
+           });
+       }
+       // Check collision with obstacle - updated to handle different types of obstacles
+       function checkObstacleCollision(state, obstacle) {
+            if (state.isExploding || state.isKilled) return false;
+            
+            let hasCollided = false;
+            
+            if (obstacle.shape === 'rectangle') {
+                // Rectangular collision detection
+                if (
+                    state.x < obstacle.x + obstacle.width &&
+                    state.x + state.width > obstacle.x &&
+                    state.y < obstacle.y + obstacle.height &&
+                    state.y + state.height > obstacle.y
+                ) {
+                    hasCollided = true;
+                }
+            } else if (obstacle.shape === 'circle') {
+                // Circle collision detection
+                const squareCenter = {
+                    x: state.x + state.width / 2,
+                    y: state.y + state.height / 2
+                };
+                
+                const obstacleCenter = {
+                    x: obstacle.x + obstacle.width / 2,
+                    y: obstacle.y + obstacle.height / 2
+                };
+                
+                const radius = obstacle.width / 2; // For circles, width = height
+                
+                // Calculate distance between centers
+                const dx = squareCenter.x - obstacleCenter.x;
+                const dy = squareCenter.y - obstacleCenter.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Check if the square's bounding rectangle intersects the circle
+                if (distance < radius + Math.max(state.width, state.height) / 2) {
+                    hasCollided = true;
+                }
+            }
+            
+            if (hasCollided) {
+                // Get centers
+                const centerX = state.x + state.width / 2;
+                const centerY = state.y + state.height / 2;
+                const obstacleCenterX = obstacle.x + obstacle.width / 2;
+                const obstacleCenterY = obstacle.y + obstacle.height / 2;
+                
+                // Calculate collision point
+                const collisionX = (centerX + obstacleCenterX) / 2;
+                const collisionY = (centerY + obstacleCenterY) / 2;
+                
+                // Special handling for breakable obstacles
+                if (obstacle.type === 'breakable') {
+                    breakObstacle(obstacle, collisionX, collisionY);
+                    
+                    // Create collision effect
+                    createCollisionEffect(
+                        collisionX, 
+                        collisionY, 
+                        state.shadow, 
+                        obstacle.color
+                    );
+                    
+                    // Don't bounce if the obstacle was destroyed (durability <= 0)
+                    if (obstacle.durability <= 0) {
+                        return true;
+                    }
+                } else {
+                    // Create collision effect for normal obstacles
+                    createCollisionEffect(
+                        collisionX, 
+                        collisionY, 
+                        state.shadow, 
+                        obstacle.color
+                    );
+                }
+                
+                // Determine which side was hit (for proper reflection)
+                const dx = centerX - obstacleCenterX;
+                const dy = centerY - obstacleCenterY;
+                
+                if (obstacle.shape === 'rectangle') {
+                    // Calculate the obstacle's aspect ratio to determine reflection behavior
+                    const aspectRatio = obstacle.width / obstacle.height;
+                    
+                    // Since the obstacle is typically wide and flat, 
+                    // prioritize vertical reflection if collision occurs near the top/bottom edges
+                    if (Math.abs(dy) * aspectRatio > Math.abs(dx)) {
+                        // Vertical collision (top/bottom of obstacle)
+                        state.direction.y *= -1;
+                        
+                        // Adjust position to prevent sticking
+                        if (dy > 0) {
+                            state.y = obstacle.y + obstacle.height;
+                        } else {
+                            state.y = obstacle.y - state.height;
+                        }
+                    } else {
+                        // Horizontal collision (sides of obstacle)
+                        state.direction.x *= -1;
+                        
+                        // Adjust position to prevent sticking
+                        if (dx > 0) {
+                            state.x = obstacle.x + obstacle.width;
+                        } else {
+                            state.x = obstacle.x - state.width;
+                        }
+                    }
+                } else if (obstacle.shape === 'circle') {
+                    // For circular obstacles, reflect based on angle of collision
+                    // Calculate normalized vector from circle center to square center
+                    const length = Math.sqrt(dx * dx + dy * dy);
+                    const nx = dx / length;
+                    const ny = dy / length;
+                    
+                    // Reflect the direction vector based on normal
+                    // For 45-degree-restricted movement, we need to reset to diagonal directions
+                    if (Math.abs(nx) > Math.abs(ny)) {
+                        // Horizontal component dominates, flip x
+                        state.direction.x *= -1;
+                    } else {
+                        // Vertical component dominates, flip y
+                        state.direction.y *= -1;
+                    }
+                    
+                    // Push the square out of the circle to prevent sticking
+                    state.x = obstacleCenterX + nx * (obstacle.width / 2 + state.width / 2);
+                    state.y = obstacleCenterY + ny * (obstacle.width / 2 + state.height / 2);
+                }
+                
+                // Add pulse effect to square without rotation
+                state.element.style.transition = 'transform 0.2s ease';
+                state.element.style.transform = 'scale(1.2)';
+                setTimeout(() => {
+                    state.element.style.transform = 'none';
+                }, 200);
+                
+                // Also add a quick flash to the obstacle
+                obstacle.element.style.transition = 'box-shadow 0.2s ease';
+                obstacle.element.style.boxShadow = `0 0 20px ${state.shadow}`;
+                setTimeout(() => {
+                    if (obstacle.element.parentNode) { // Check if still exists
+                        if (obstacle.type === 'breakable') {
+                            obstacle.element.style.boxShadow = '0 0 15px rgba(255, 140, 0, 0.6)';
+                        } else if (obstacle.type === 'moving') {
+                            obstacle.element.style.boxShadow = '0 0 15px rgba(128, 0, 128, 0.6)';
+                        } else {
+                            obstacle.element.style.boxShadow = 'none';
+                        }
+                    }
+                }, 200);
+                
+                return true;
+            }
+            
+            return false;
+        }
+        
+        // Check collision with frame
+        function checkFrameCollision(state) {
+            if (state.isExploding || state.isKilled) return false;
+            
+            const frameWidth = frame.clientWidth;
+            const frameHeight = frame.clientHeight;
+            let hasCollided = false;
+            
+            // Check horizontal boundaries with proper reflection
+            if (state.x <= 0) {
+                state.x = 0;
+                state.direction.x *= -1;
+                hasCollided = true;
+            } else if (state.x + state.width >= frameWidth) {
+                state.x = frameWidth - state.width;
+                state.direction.x *= -1;
+                hasCollided = true;
+            }
+            
+            // Check vertical boundaries with proper reflection
+            if (state.y <= 0) {
+                state.y = 0;
+                state.direction.y *= -1;
+                hasCollided = true;
+            } else if (state.y + state.height >= frameHeight) {
+                state.y = frameHeight - state.height;
+                state.direction.y *= -1;
+                hasCollided = true;
+            }
+            
+            // Create wall collision effect
+            if (hasCollided) {
+                createCollisionEffect(
+                    state.x + state.width/2,
+                    state.y + state.height/2,
+                    state.shadow,
+                    'rgba(0, 0, 0, 0.8)'
+                );
+                
+                // Add pulse effect to the square but without rotation
+                state.element.style.transition = 'transform 0.2s ease';
+                state.element.style.transform = 'scale(1.2)';
+                setTimeout(() => {
+                    state.element.style.transform = 'none';
+                }, 200);
+            }
+            
+            return hasCollided;
+        }
+        // Check collision with block
+        function checkBlockCollision(state, block) {
+            if (state.isExploding || state.isKilled) return false;
+            
+            // Check for collision with block
+            if (
+                state.x < block.x + block.width &&
+                state.x + state.width > block.x &&
+                state.y < block.y + block.height &&
+                state.y + state.height > block.y
+            ) {
+                // Handle based on block type
+                switch (block.type) {
+                    case 'teleporter':
+                        teleportSquare(state, block);
+                        break;
+                    case 'killer':
+                        // Small delay before explosion
+                        setTimeout(() => {
+                            createExplosion(state);
+                        }, 200);
+                        break;
+                    case 'transformer':
+                        transformSquare(state);
+                        break;
+                    case 'finishline':
+                        // Show finish message after a small delay
+                        showFinish();
+                        break;
+                }
+                
+                return true;
+            }
+            
+            return false;
+        }
+
+        // Check if item is collided with
+        function checkItemCollision(state, item) {
+            if (state.isExploding || state.isKilled) return false;
+            
+            // Check for collision with item
+            if (
+                state.x < item.x + item.size &&
+                state.x + state.width > item.x &&
+                state.y < item.y + item.size &&
+                state.y + state.height > item.y
+            ) {
+                // Handle based on item type
+                switch (item.type) {
+                    case 'knife':
+                        if (!state.hasKnife && state.knifePickupCooldown <= 0) {
+                            giveKnife(state, item);
+                        }
+                        break;
+                }
+                
+                return true;
+            }
+            
+            return false;
+        }
+        
+        // Check collision between squares with proper reflection
+        function checkSquareCollisions() {
+            for (let i = 0; i < squareStates.length; i++) {
+                for (let j = i + 1; j < squareStates.length; j++) {
+                    const square1 = squareStates[i];
+                    const square2 = squareStates[j];
+                    
+                    // Skip if either square is exploding or killed
+                    if (square1.isExploding || square1.isKilled || 
+                        square2.isExploding || square2.isKilled) continue;
+                    
+                    // Check for collision
+                    if (
+                        square1.x < square2.x + square2.width &&
+                        square1.x + square1.width > square2.x &&
+                        square1.y < square2.y + square2.height &&
+                        square1.y + square1.height > square2.y
+                    ) {
+                        // Calculate collision point for knife dropping
+                        const center1X = square1.x + square1.width / 2;
+                        const center1Y = square1.y + square1.height / 2;
+                        const center2X = square2.x + square2.width / 2;
+                        const center2Y = square2.y + square2.height / 2;
+                        const collisionX = (center1X + center2X) / 2;
+                        const collisionY = (center1Y + center2Y) / 2;
+                        
+                        // Check if any square has a knife
+                        if (square1.hasKnife) {
+                            // Square 1 has knife, kill square 2
+                            createExplosion(square2);
+                            
+                            // Drop the knife at the collision point
+                            const knifeSize = parseInt(itemSizeInput.value) || KNIFE_SIZE;
+                            createItem(
+                                collisionX - (knifeSize / 2),
+                                collisionY - (knifeSize / 2),
+                                'knife',
+                                knifeSize
+                            );
+                            
+                            // Square 1 no longer has knife - restore original size and image
+                            square1.hasKnife = false;
+                            square1.element.classList.remove('has-knife');
+                            square1.knifePickupCooldown = KNIFE_PICKUP_COOLDOWN;
+                            
+                            // Reset size based on whether it's small or not
+                            if (square1.isSmall) {
+                                square1.width = SMALL_SQUARE_SIZE;
+                                square1.height = SMALL_SQUARE_SIZE;
+                            } else {
+                                square1.width = NORMAL_SQUARE_SIZE;
+                                square1.height = NORMAL_SQUARE_SIZE;
+                            }
+                            
+                            // Reset original image
+                            square1.element.style.backgroundImage = `url(${square1.image})`;
+                            
+                            // Update square size
+                            updateSquareSize(square1);
+                            
+                            return; // Skip regular collision handling
+                        } else if (square2.hasKnife) {
+                            // Square 2 has knife, kill square 1
+                            createExplosion(square1);
+                            
+                            // Drop the knife at the collision point
+                            const knifeSize = parseInt(itemSizeInput.value) || KNIFE_SIZE;
+                            createItem(
+                                collisionX - (knifeSize / 2),
+                                collisionY - (knifeSize / 2),
+                                'knife',
+                                knifeSize
+                            );
+                            
+                            // Square 2 no longer has knife - restore original size and image
+                            square2.hasKnife = false;
+                            square2.element.classList.remove('has-knife');
+                            square2.knifePickupCooldown = KNIFE_PICKUP_COOLDOWN;
+                            
+                            // Reset size based on whether it's small or not
+                            if (square2.isSmall) {
+                                square2.width = SMALL_SQUARE_SIZE;
+                                square2.height = SMALL_SQUARE_SIZE;
+                            } else {
+                                square2.width = NORMAL_SQUARE_SIZE;
+                                square2.height = NORMAL_SQUARE_SIZE;
+                            }
+                            
+                            // Reset original image
+                            square2.element.style.backgroundImage = `url(${square2.image})`;
+                            
+                            // Update square size
+                            updateSquareSize(square2);
+                            
+                            return; // Skip regular collision handling
+                        }
+                        
+                        // No knife, proceed with normal collision
+                        
+                        // Create collision effect
+                        createCollisionEffect(collisionX, collisionY, square1.shadow, square2.shadow);
+                        
+                        // Calculate collision angle
+                        const dx = center2X - center1X;
+                        const dy = center2Y - center1Y;
+                        
+                        // Determine collision angle (which diagonal)
+                        // Since we're restricted to 45° angles, we need to find which diagonal the collision happened on
+                        
+                        // Implement reflective collision based on which side was hit
+                        // This maintains diagonal movement while reflecting properly
+                        if (Math.abs(dx) > Math.abs(dy)) {
+                            // Horizontal collision predominant - reflect x directions
+                            square1.direction.x *= -1;
+                            square2.direction.x *= -1;
+                        } else {
+                            // Vertical collision predominant - reflect y directions
+                            square1.direction.y *= -1;
+                            square2.direction.y *= -1;
+                        }
+                        
+                        // Move squares slightly apart to prevent sticking
+                        if (dx > 0) {
+                            square1.x -= 1;
+                            square2.x += 1;
+                        } else {
+                            square1.x += 1;
+                            square2.x -= 1;
+                        }
+                        
+                        if (dy > 0) {
+                            square1.y -= 1;
+                            square2.y += 1;
+                        } else {
+                            square1.y += 1;
+                            square2.y -= 1;
+                        }
+                        
+                        // Add pulse effect to both squares without rotation
+                        [square1.element, square2.element].forEach(element => {
+                            element.style.transition = 'transform 0.2s ease';
+                            element.style.transform = 'scale(1.2)';
+                            setTimeout(() => {
+                                element.style.transform = 'none';
+                            }, 200);
+                        });
+                    }
+                }
+            }
+        }
+        
+        // Animation loop
+        function animate() {
+            frameCount++;
+            
+            // Don't animate if game is finished
+            if (isGameFinished) {
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
+                }
+                return;
+            }
+            
+            // Update moving obstacles
+            updateMovingObstacles();
+            
+            // Check if any square is trapped between obstacles
+            if (frameCount % 5 === 0) { // Only check every 5 frames to save CPU
+                checkSquareTrapped();
+            }
+            
+            // Update positions
+            squareStates.forEach(state => {
+                // Skip if square is exploding, killed, or being dragged
+                if (state.isExploding || state.isKilled || (selectedSquare === state && isDragging)) {
+                    return;
+                }
+                
+                // Decrease teleport cooldown
+                if (state.teleportCooldown > 0) {
+                    state.teleportCooldown--;
+                }
+                
+                // Decrease knife pickup cooldown
+                if (state.knifePickupCooldown > 0) {
+                    state.knifePickupCooldown -= 16; // Approximately 16ms per frame at 60fps
+                }
+                
+                // Move square
+                state.x += state.direction.x * state.speed;
+                state.y += state.direction.y * state.speed;
+                
+                // Check collisions in order
+                let hasCollided = false;
+                
+                // 1. Check block collisions first (special effects)
+                for (let i = 0; i < blocks.length; i++) {
+                    if (checkBlockCollision(state, blocks[i])) {
+                        hasCollided = true;
+                        break;
+                    }
+                }
+                
+                // 2. Check item collisions
+                if (!hasCollided) {
+                    for (let i = 0; i < items.length; i++) {
+                        if (checkItemCollision(state, items[i])) {
+                            hasCollided = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // 3. If no block or item collision, check obstacles and walls
+                if (!hasCollided) {
+                    // Check obstacle collisions (bounce or break)
+                    for (let i = 0; i < obstacles.length; i++) {
+                        if (checkObstacleCollision(state, obstacles[i])) {
+                            hasCollided = true;
+                            break;
+                        }
+                    }
+                    
+                    // Check frame collision (bounce)
+                    if (!hasCollided) {
+                        checkFrameCollision(state);
+                    }
+                }
+                
+                // Create trails
+                createTrail(state);
+                
+                // Update DOM
+                updateSquarePosition(state);
+            });
+            
+            // Check collisions between squares
+            checkSquareCollisions();
+            
+            // Continue animation
+            animationId = requestAnimationFrame(animate);
+        }
+        
+        // Create a new obstacle
+        function createObstacle(x, y) {
+            // Get options for the new obstacle
+            const width = parseInt(obstacleWidthInput.value) || 70;
+            const height = parseInt(obstacleHeightInput.value) || 10;
+            const color = obstacleColorInput.value || '#000000';
+            const opacity = parseFloat(obstacleOpacityInput.value) || 0.8;
+            const shape = obstacleShapeInput.value || 'rectangle';
+            
+            // Create DOM element
+            const obstacleElement = document.createElement('div');
+            obstacleElement.classList.add('obstacle');
+            obstacleElement.style.width = `${width}px`;
+            obstacleElement.style.height = `${height}px`;
+            
+            // Set color with opacity
+            const rgbaColor = `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, ${opacity})`;
+            obstacleElement.style.backgroundColor = rgbaColor;
+            
+            // Position at cursor
+            obstacleElement.style.left = `${x - width/2}px`;
+            obstacleElement.style.top = `${y - height/2}px`;
+            
+            // Apply border radius for circle shape
+            if (shape === 'circle') {
+                obstacleElement.style.borderRadius = '50%';
+            } else {
+                obstacleElement.style.borderRadius = '2px';
+            }
+            
+            // Add delete button
+            const deleteBtn = document.createElement('div');
+            deleteBtn.classList.add('obstacle-delete');
+            deleteBtn.textContent = '×';
+            obstacleElement.appendChild(deleteBtn);
+            
+            // Add to frame
+            frame.appendChild(obstacleElement);
+            
+            // Create obstacle state object
+            const newObstacle = {
+                element: obstacleElement,
+                x: x - width/2,
+                y: y - height/2,
+                width: width,
+                height: height,
+                shape: shape,
+                color: rgbaColor,
+                type: 'normal',
+                durability: 3 // Default durability even for normal obstacles
+            };
+            
+            // Add to obstacles array
+            obstacles.push(newObstacle);
+            
+            // Setup interaction events
+            setupObstacleInteraction(obstacleElement, newObstacle);
+            
+            return newObstacle;
+        }
+        
+        // Create a breakable obstacle
+        function createBreakableObstacle(x, y) {
+            // Get options for the new obstacle
+            const width = parseInt(obstacleWidthInput.value) || 70;
+            const height = parseInt(obstacleHeightInput.value) || 10;
+            const shape = obstacleShapeInput.value || 'rectangle';
+            const durability = parseInt(obstacleDurabilityInput.value) || 3;
+            
+            // Create DOM element
+            const obstacleElement = document.createElement('div');
+            obstacleElement.classList.add('obstacle', 'breakable');
+            obstacleElement.style.width = `${width}px`;
+            obstacleElement.style.height = `${height}px`;
+            
+            // Position at cursor
+            obstacleElement.style.left = `${x - width/2}px`;
+            obstacleElement.style.top = `${y - height/2}px`;
+            
+            // Apply border radius for circle shape
+            if (shape === 'circle') {
+                obstacleElement.style.borderRadius = '50%';
+            } else {
+                obstacleElement.style.borderRadius = '2px';
+            }
+            
+            // Add durability indicator
+            obstacleElement.setAttribute('data-durability', durability);
+            
+            // Add delete button
+            const deleteBtn = document.createElement('div');
+            deleteBtn.classList.add('obstacle-delete');
+            deleteBtn.textContent = '×';
+            obstacleElement.appendChild(deleteBtn);
+            
+            // Add to frame
+            frame.appendChild(obstacleElement);
+            
+            // Create obstacle state object
+            const newObstacle = {
+                element: obstacleElement,
+                x: x - width/2,
+                y: y - height/2,
+                width: width,
+                height: height,
+                shape: shape,
+                color: 'rgba(150, 75, 0, 0.8)',
+                type: 'breakable',
+                durability: durability
+            };
+            
+            // Add to obstacles array
+            obstacles.push(newObstacle);
+            
+            // Setup interaction events
+            setupObstacleInteraction(obstacleElement, newObstacle);
+            
+            return newObstacle;
+        }
+        // Create a moving obstacle
+        function createMovingObstacle(x, y) {
+            // Get options for the new obstacle
+            const width = parseInt(obstacleWidthInput.value) || 70;
+            const height = parseInt(obstacleHeightInput.value) || 10;
+            const shape = obstacleShapeInput.value || 'rectangle';
+            
+            // Create DOM element
+            const obstacleElement = document.createElement('div');
+            obstacleElement.classList.add('obstacle', 'moving');
+            obstacleElement.style.width = `${width}px`;
+            obstacleElement.style.height = `${height}px`;
+            
+            // Position at cursor
+            obstacleElement.style.left = `${x - width/2}px`;
+            obstacleElement.style.top = `${y - height/2}px`;
+            
+            // Apply border radius for circle shape
+            if (shape === 'circle') {
+                obstacleElement.style.borderRadius = '50%';
+            } else {
+                obstacleElement.style.borderRadius = '2px';
+            }
+            
+            // Add delete button
+            const deleteBtn = document.createElement('div');
+            deleteBtn.classList.add('obstacle-delete');
+            deleteBtn.textContent = '×';
+            obstacleElement.appendChild(deleteBtn);
+            
+            // Add to frame
+            frame.appendChild(obstacleElement);
+            
+            // Create obstacle state object
+            const newObstacle = {
+                element: obstacleElement,
+                x: x - width/2,
+                y: y - height/2,
+                width: width,
+                height: height,
+                shape: shape,
+                color: 'rgba(75, 0, 130, 0.8)',
+                type: 'moving',
+                moving: true,
+                waypoints: [],
+                currentWaypoint: 0,
+                movementType: currentMovementType,
+                speed: parseInt(movingSpeedInput.value) || 3,
+                progress: 0
+            };
+            
+            // Add to obstacles array
+            obstacles.push(newObstacle);
+            
+            // Setup interaction events
+            setupObstacleInteraction(obstacleElement, newObstacle);
+            
+            return newObstacle;
+        }
+        
+        // Create a block with special properties
+        function createBlock(x, y, type) {
+            // Get options for the new block
+            const width = parseInt(blockWidthInput.value) || 50;
+            const height = parseInt(blockHeightInput.value) || 50;
+            
+            // Create DOM element
+            const blockElement = document.createElement('div');
+            blockElement.classList.add('block');
+            blockElement.classList.add(type);
+            blockElement.style.width = `${width}px`;
+            blockElement.style.height = `${height}px`;
+            
+            // Position at cursor
+            blockElement.style.left = `${x - width/2}px`;
+            blockElement.style.top = `${y - height/2}px`;
+            
+            // Add delete button
+            const deleteBtn = document.createElement('div');
+            deleteBtn.classList.add('block-delete');
+            deleteBtn.textContent = '×';
+            blockElement.appendChild(deleteBtn);
+            
+            // Add to frame
+            frame.appendChild(blockElement);
+            
+            // Create block state object
+            const newBlock = {
+                element: blockElement,
+                x: x - width/2,
+                y: y - height/2,
+                width: width,
+                height: height,
+                type: type
+            };
+            
+            // Add to blocks array
+            blocks.push(newBlock);
+            
+            // Setup interaction events
+            setupBlockInteraction(blockElement, newBlock);
+            
+            return newBlock;
+        }
+
+        // Create an item (knife, etc.)
+        function createItem(x, y, type, size = KNIFE_SIZE) {
+            // Create DOM element
+            const itemElement = document.createElement('div');
+            itemElement.classList.add('item');
+            itemElement.classList.add(type);
+            itemElement.style.width = `${size}px`;
+            itemElement.style.height = `${size}px`;
+            
+            // Position at cursor
+            itemElement.style.left = `${x}px`;
+            itemElement.style.top = `${y}px`;
+            
+            // Add delete button
+            const deleteBtn = document.createElement('div');
+            deleteBtn.classList.add('item-delete');
+            deleteBtn.textContent = '×';
+            itemElement.appendChild(deleteBtn);
+            
+            // Add to frame
+            frame.appendChild(itemElement);
+            
+            // Create item state object
+            const newItem = {
+                element: itemElement,
+                x: x,
+                y: y,
+                size: size,
+                type: type
+            };
+            
+            // Add to items array
+            items.push(newItem);
+            
+            // Setup interaction events
+            setupItemInteraction(itemElement, newItem);
+            
+            return newItem;
+        }
+        
+        // Setup a waypoint for moving obstacles
+        function setupWaypoint(element, waypoint, index) {
+            // Delete button
+            const deleteBtn = document.createElement('div');
+            deleteBtn.classList.add('waypoint-delete');
+            deleteBtn.textContent = '×';
+            element.appendChild(deleteBtn);
+            
+            // Click to select
+            element.addEventListener('click', (e) => {
+                if (e.target === deleteBtn) return;
+                if (isAddingObstacle || isAddingBlock || isAddingItem) return;
+    
+                // Deselect any selected object
+                deselectAllObjects();
+    
+                // Select this waypoint
+                selectedWaypoint = waypoint;
+                element.classList.add('selected');
+                deleteBtn.style.display = 'flex';
+    
+                updateSelectionStatus();
+            });
+            
+            // Delete button click
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                
+                // Remove from DOM
+                element.remove();
+                
+                // Remove from array
+                const wpIndex = movingWaypoints.indexOf(waypoint);
+                if (wpIndex > -1) {
+                    movingWaypoints.splice(wpIndex, 1);
+                }
+                
+                // Update obstacle waypoints if this is for a specific obstacle
+                if (currentMovingObstacle) {
+                    currentMovingObstacle.waypoints = movingWaypoints.slice();
+                }
+                
+                // Clear selection if this was the selected waypoint
+                if (selectedWaypoint === waypoint) {
+                    selectedWaypoint = null;
+                    updateSelectionStatus();
+                }
+                
+                // Update path indicator
+                updatePathIndicator();
+            });
+            
+            // Drag functionality
+            element.addEventListener('mousedown', (e) => {
+                if (e.target === deleteBtn) return;
+                
+                // Select this waypoint if not already selected
+                if (selectedWaypoint !== waypoint) {
+                    // Deselect any selected object
+                    deselectAllObjects();
+                    // Select this waypoint
+                    selectedWaypoint = waypoint;
+                    element.classList.add('selected');
+                    deleteBtn.style.display = 'flex';
+                    
+                    updateSelectionStatus();
+                }
+                
+                // Start dragging
+                isDragging = true;
+                dragOffsetX = e.clientX - waypoint.x;
+                dragOffsetY = e.clientY - waypoint.y;
+                
+                // Prevent default behavior
+                e.preventDefault();
+            });
+        }
+        // Update path indicator for moving obstacles
+        function updatePathIndicator() {
+            // Remove existing path indicator
+            if (pathIndicator) {
+                pathIndicator.remove();
+                pathIndicator = null;
+            }
+            
+            // If fewer than 2 waypoints, no path to show
+            if (movingWaypoints.length < 2) return;
+            
+            // Create new path indicator
+            pathIndicator = document.createElement('div');
+            pathIndicator.classList.add('moving-path-indicator');
+            
+            if (currentMovementType === 'linear') {
+                // For linear movement, draw a polygon connecting all waypoints
+                const points = movingWaypoints.map(wp => `${wp.x},${wp.y}`).join(' ');
+                pathIndicator.style.clipPath = `polygon(${points})`;
+                
+                // Calculate bounding box
+                let minX = Infinity;
+                let minY = Infinity;
+                let maxX = -Infinity;
+                let maxY = -Infinity;
+                
+                movingWaypoints.forEach(wp => {
+                    minX = Math.min(minX, wp.x);
+                    minY = Math.min(minY, wp.y);
+                    maxX = Math.max(maxX, wp.x);
+                    maxY = Math.max(maxY, wp.y);
+                });
+                
+                // Position and size
+                pathIndicator.style.left = `${minX}px`;
+                pathIndicator.style.top = `${minY}px`;
+                pathIndicator.style.width = `${maxX - minX}px`;
+                pathIndicator.style.height = `${maxY - minY}px`;
+            } else if (currentMovementType === 'circular') {
+                // For circular movement, calculate center and radius
+                const center = {
+                    x: 0,
+                    y: 0
+                };
+                
+                // Calculate center as average of all waypoints
+                movingWaypoints.forEach(wp => {
+                    center.x += wp.x;
+                    center.y += wp.y;
+                });
+                
+                center.x /= movingWaypoints.length;
+                center.y /= movingWaypoints.length;
+                
+                // Calculate radius as average distance to center
+                let radius = 0;
+                movingWaypoints.forEach(wp => {
+                    const dx = wp.x - center.x;
+                    const dy = wp.y - center.y;
+                    radius += Math.sqrt(dx * dx + dy * dy);
+                });
+                
+                radius /= movingWaypoints.length;
+                
+                // Position and size
+                pathIndicator.style.left = `${center.x - radius}px`;
+                pathIndicator.style.top = `${center.y - radius}px`;
+                pathIndicator.style.width = `${radius * 2}px`;
+                pathIndicator.style.height = `${radius * 2}px`;
+                pathIndicator.style.borderRadius = '50%';
+            }
+            
+            // Add to frame
+            frame.appendChild(pathIndicator);
+        }
+
+        // Create a new waypoint
+        function createWaypoint(x, y) {
+            // Create DOM element
+            const waypointElement = document.createElement('div');
+            waypointElement.classList.add('waypoint');
+            
+            // Position at cursor
+            waypointElement.style.left = `${x - 5}px`;
+            waypointElement.style.top = `${y - 5}px`;
+            
+            // Add to frame
+            frame.appendChild(waypointElement);
+            
+            // Create waypoint state object
+            const newWaypoint = {
+                element: waypointElement,
+                x: x,
+                y: y
+            };
+            
+            // Add to waypoints array
+            movingWaypoints.push(newWaypoint);
+            
+            // Update obstacle waypoints if this is for a specific obstacle
+            if (currentMovingObstacle) {
+                currentMovingObstacle.waypoints.push({
+                    x: x,
+                    y: y
+                });
+            }
+            
+            // Setup interaction events
+            setupWaypoint(waypointElement, newWaypoint, movingWaypoints.length - 1);
+            
+            // Update path indicator
+            updatePathIndicator();
+            
+            return newWaypoint;
+        }
+        
+        // Setup obstacle interaction (drag, delete, select)
+        function setupObstacleInteraction(element, obstacle) {
+            // Delete button
+            const deleteBtn = element.querySelector('.obstacle-delete') || document.createElement('div');
+            
+            if (!element.querySelector('.obstacle-delete')) {
+                deleteBtn.classList.add('obstacle-delete');
+                deleteBtn.textContent = '×';
+                element.appendChild(deleteBtn);
+            }
+            
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Remove from DOM
+                element.remove();
+                // Remove from array
+                const index = obstacles.indexOf(obstacle);
+                if (index > -1) {
+                    obstacles.splice(index, 1);
+                }
+                
+                // Clear selection if this was the selected obstacle
+                if (selectedObstacle === obstacle) {
+                    selectedObstacle = null;
+                    updateSelectionStatus();
+                }
+            });
+            
+            // Select obstacle
+            element.addEventListener('click', (e) => {
+                if (e.target === deleteBtn) return;
+                if (isAddingObstacle || isAddingBlock || isAddingItem) return;
+                
+                // Deselect any selected object
+                deselectAllObjects();
+                
+                // Select this obstacle
+                selectedObstacle = obstacle;
+                element.classList.add('selected');
+                deleteBtn.style.display = 'flex';
+                
+                updateSelectionStatus();
+            });
+            
+            // Drag functionality
+            element.addEventListener('mousedown', (e) => {
+                if (e.target === deleteBtn) return;
+                if (isAddingObstacle || isAddingBlock || isAddingItem) return;
+                
+                // Select this obstacle if not already selected
+                if (selectedObstacle !== obstacle) {
+                    // Deselect any selected object
+                    deselectAllObjects();
+                    
+                    // Select this obstacle
+                    selectedObstacle = obstacle;
+                    element.classList.add('selected');
+                    deleteBtn.style.display = 'flex';
+                    
+                    updateSelectionStatus();
+                }
+                
+                // Start dragging
+                isDragging = true;
+                dragOffsetX = e.clientX - obstacle.x;
+                dragOffsetY = e.clientY - obstacle.y;
+                
+                // Prevent default behavior
+                e.preventDefault();
+            });
+            
+            // Wheel event for resizing - only prevent default when directly over the element
+            element.addEventListener('wheel', (e) => {
+                // Only if this obstacle is selected
+                if (selectedObstacle === obstacle) {
+                    e.preventDefault(); // Prevent scrolling the page
+                    
+                    // Determine resize amount
+                    const resizeAmount = e.shiftKey ? SCROLL_RESIZE_AMOUNT_FINE : SCROLL_RESIZE_AMOUNT;
+                    const direction = e.deltaY < 0 ? 1 : -1; // Positive for scroll up, negative for scroll down
+                    
+                    // For rectangles, determine which dimension to resize based on Alt key
+                    if (obstacle.shape === 'rectangle') {
+                        if (e.altKey) {
+                            // Resize height
+                            obstacle.height = Math.max(10, obstacle.height + (direction * resizeAmount));
+                        } else {
+                            // Resize width
+                            obstacle.width = Math.max(10, obstacle.width + (direction * resizeAmount));
+                        }
+                    } else if (obstacle.shape === 'circle') {
+                        // For circles, resize both dimensions equally
+                        obstacle.width = Math.max(10, obstacle.width + (direction * resizeAmount));
+                        obstacle.height = obstacle.width; // Keep circle proportions
+                    }
+                    
+                    // Update DOM
+                    updateObstacleSize(obstacle);
+                    
+                    // Update input fields
+                    obstacleWidthInput.value = obstacle.width;
+                    obstacleHeightInput.value = obstacle.height;
+                }
+            });
+        }
+        // Setup block interaction (drag, delete, select)
+        function setupBlockInteraction(element, block) {
+            // Delete button
+            const deleteBtn = element.querySelector('.block-delete') || document.createElement('div');
+            
+            if (!element.querySelector('.block-delete')) {
+                deleteBtn.classList.add('block-delete');
+                deleteBtn.textContent = '×';
+                element.appendChild(deleteBtn);
+            }
+            
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Remove from DOM
+                element.remove();
+                // Remove from array
+                const index = blocks.indexOf(block);
+                if (index > -1) {
+                    blocks.splice(index, 1);
+                }
+                
+                // Clear selection if this was the selected block
+                if (selectedBlock === block) {
+                    selectedBlock = null;
+                    updateSelectionStatus();
+                }
+            });
+            
+            // Select block
+            element.addEventListener('click', (e) => {
+                if (e.target === deleteBtn) return;
+                if (isAddingObstacle || isAddingBlock || isAddingItem) return;
+                
+                // Deselect any selected object
+                deselectAllObjects();
+                
+                // Select this block
+                selectedBlock = block;
+                element.classList.add('selected');
+                deleteBtn.style.display = 'flex';
+                
+                updateSelectionStatus();
+            });
+            
+            // Drag functionality
+            element.addEventListener('mousedown', (e) => {
+                if (e.target === deleteBtn) return;
+                if (isAddingObstacle || isAddingBlock || isAddingItem) return;
+                
+                // Select this block if not already selected
+                if (selectedBlock !== block) {
+                    // Deselect any selected object
+                    deselectAllObjects();
+                    
+                    // Select this block
+                    selectedBlock = block;
+                    element.classList.add('selected');
+                    deleteBtn.style.display = 'flex';
+                    
+                    updateSelectionStatus();
+                }
+                
+                // Start dragging
+                isDragging = true;
+                dragOffsetX = e.clientX - block.x;
+                dragOffsetY = e.clientY - block.y;
+                
+                // Prevent default behavior
+                e.preventDefault();
+            });
+            
+            // Wheel event for resizing
+            element.addEventListener('wheel', (e) => {
+                // Only if this block is selected
+                if (selectedBlock === block) {
+                    e.preventDefault(); // Prevent scrolling the page
+                    
+                    // Determine resize amount
+                    const resizeAmount = e.shiftKey ? SCROLL_RESIZE_AMOUNT_FINE : SCROLL_RESIZE_AMOUNT;
+                    const direction = e.deltaY < 0 ? 1 : -1; // Positive for scroll up, negative for scroll down
+                    
+                    if (e.altKey) {
+                        // Resize height
+                        block.height = Math.max(10, block.height + (direction * resizeAmount));
+                    } else {
+                        // Resize width
+                        block.width = Math.max(10, block.width + (direction * resizeAmount));
+                    }
+                    
+                    // Update DOM
+                    updateBlockSize(block);
+                    
+                    // Update input fields
+                    blockWidthInput.value = block.width;
+                    blockHeightInput.value = block.height;
+                }
+            });
+        }
+        
+        // Setup item interaction (drag, delete, select)
+        function setupItemInteraction(element, item) {
+            // Delete button
+            const deleteBtn = element.querySelector('.item-delete') || document.createElement('div');
+            
+            if (!element.querySelector('.item-delete')) {
+                deleteBtn.classList.add('item-delete');
+                deleteBtn.textContent = '×';
+                element.appendChild(deleteBtn);
+            }
+            
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Remove from DOM
+                element.remove();
+                // Remove from array
+                const index = items.indexOf(item);
+                if (index > -1) {
+                    items.splice(index, 1);
+                }
+                
+                // Clear selection if this was the selected item
+                if (selectedItem === item) {
+                    selectedItem = null;
+                    updateSelectionStatus();
+                }
+            });
+            
+            // Select item
+            element.addEventListener('click', (e) => {
+                if (e.target === deleteBtn) return;
+                if (isAddingObstacle || isAddingBlock || isAddingItem) return;
+                
+                // Deselect any selected object
+                deselectAllObjects();
+                
+                // Select this item
+                selectedItem = item;
+                element.classList.add('selected');
+                deleteBtn.style.display = 'flex';
+                
+                updateSelectionStatus();
+            });
+            
+            // Drag functionality
+            element.addEventListener('mousedown', (e) => {
+                if (e.target === deleteBtn) return;
+                if (isAddingObstacle || isAddingBlock || isAddingItem) return;
+                
+                // Select this item if not already selected
+                if (selectedItem !== item) {
+                    // Deselect any selected object
+                    deselectAllObjects();
+                    
+                    // Select this item
+                    selectedItem = item;
+                    element.classList.add('selected');
+                    deleteBtn.style.display = 'flex';
+                    
+                    updateSelectionStatus();
+                }
+                
+                // Start dragging
+                isDragging = true;
+                dragOffsetX = e.clientX - item.x;
+                dragOffsetY = e.clientY - item.y;
+                
+                // Prevent default behavior
+                e.preventDefault();
+            });
+            
+            // Wheel event for resizing
+            element.addEventListener('wheel', (e) => {
+                // Only if this item is selected
+                if (selectedItem === item) {
+                    e.preventDefault(); // Prevent scrolling the page
+                    
+                    // Determine resize amount
+                    const resizeAmount = e.shiftKey ? SCROLL_RESIZE_AMOUNT_FINE : SCROLL_RESIZE_AMOUNT;
+                    const direction = e.deltaY < 0 ? 1 : -1; // Positive for scroll up, negative for scroll down
+                    
+                    // Resize uniformly
+                    item.size = Math.max(10, item.size + (direction * resizeAmount));
+                    
+                    // Update DOM
+                    updateItemSize(item);
+                    
+                    // Update input field
+                    itemSizeInput.value = item.size;
+                }
+            });
+        }
+        
+        // Setup square interaction (select, drag)
+        function setupSquareInteraction(element, square, index) {
+            // Select square
+            element.addEventListener('click', (e) => {
+                if (isAddingObstacle || isAddingBlock || isAddingItem) return;
+                if (square.isExploding || square.isKilled) return;
+                
+                // Deselect any selected object
+                deselectAllObjects();
+                
+                // Select this square
+                selectedSquare = square;
+                selectedSquareIndex = index;
+                element.classList.add('selected');
+                
+                // Show the spawn point for this square
+                spawnPoints.forEach((spawn, i) => {
+                    spawn.style.display = i === index ? 'block' : 'none';
+                });
+                
+                updateSelectionStatus();
+                
+                // Prevent default behavior
+                e.preventDefault();
+            });
+            
+            // Drag functionality
+            element.addEventListener('mousedown', (e) => {
+                if (isAddingObstacle || isAddingBlock || isAddingItem) return;
+                if (square.isExploding || square.isKilled) return;
+                
+                // Stop animation if it's running
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
+                }
+                
+                // Select this square if not already selected
+                if (selectedSquare !== square) {
+                    // Deselect any selected object
+                    deselectAllObjects();
+                    
+                    // Select this square
+                    selectedSquare = square;
+                    selectedSquareIndex = index;
+                    element.classList.add('selected');
+                    
+                    // Show the spawn point for this square
+                    spawnPoints.forEach((spawn, i) => {
+                        spawn.style.display = i === index ? 'block' : 'none';
+                    });
+                    
+                    updateSelectionStatus();
+                }
+                
+                // Start dragging
+                isDragging = true;
+                dragOffsetX = e.clientX - square.x;
+                dragOffsetY = e.clientY - square.y;
+                
+                // Prevent default behavior
+                e.preventDefault();
+            });
+            
+            // Wheel event for resizing square
+            element.addEventListener('wheel', (e) => {
+                // Only if this square is selected
+                if (selectedSquare === square) {
+                    e.preventDefault(); // Prevent scrolling the page
+                    
+                    // Toggle square size
+                    square.isSmall = !square.isSmall;
+                    
+                    if (square.isSmall) {
+                        square.width = SMALL_SQUARE_SIZE;
+                        square.height = SMALL_SQUARE_SIZE;
+                        square.element.classList.add('small');
+                    } else {
+                        square.width = NORMAL_SQUARE_SIZE;
+                        square.height = NORMAL_SQUARE_SIZE;
+                        square.element.classList.remove('small');
+                    }
+                    
+                    // Update DOM
+                    updateSquareSize(square);
+                    
+                    // Update spawn point size
+                    spawnPoints[index].style.width = square.width + 'px';
+                    spawnPoints[index].style.height = square.height + 'px';
+                }
+            });
+        }
+        
+        // Deselect all objects
+        function deselectAllObjects() {
+            // Deselect obstacle if any selected
+            if (selectedObstacle) {
+                selectedObstacle.element.classList.remove('selected');
+                const deleteBtn = selectedObstacle.element.querySelector('.obstacle-delete');
+                if (deleteBtn) deleteBtn.style.display = 'none';
+                selectedObstacle = null;
+            }
+            
+            // Deselect block if any selected
+            if (selectedBlock) {
+                selectedBlock.element.classList.remove('selected');
+                const deleteBtn = selectedBlock.element.querySelector('.block-delete');
+                if (deleteBtn) deleteBtn.style.display = 'none';
+                selectedBlock = null;
+            }
+
+            // Deselect item if any selected
+            if (selectedItem) {
+                selectedItem.element.classList.remove('selected');
+                const deleteBtn = selectedItem.element.querySelector('.item-delete');
+                if (deleteBtn) deleteBtn.style.display = 'none';
+                selectedItem = null;
+            }
+            
+            // Deselect square if any selected
+            if (selectedSquare) {
+                selectedSquare.element.classList.remove('selected');
+                selectedSquare = null;
+                selectedSquareIndex = null;
+                
+                // Hide all spawn points
+                spawnPoints.forEach(spawn => {
+                    spawn.style.display = 'none';
+                });
+            }
+
+            // Deselect waypoint if any selected
+            if (selectedWaypoint) {
+                selectedWaypoint.element.classList.remove('selected');
+                const deleteBtn = selectedWaypoint.element.querySelector('.waypoint-delete');
+                if (deleteBtn) deleteBtn.style.display = 'none';
+                selectedWaypoint = null;
+            }
+        }
+        
+        // Mouse move event for dragging
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const frameRect = frame.getBoundingClientRect();
+            
+            if (selectedObstacle) {
+                // Calculate new position within frame boundaries
+                let newX = e.clientX - dragOffsetX - frameRect.left;
+                let newY = e.clientY - dragOffsetY - frameRect.top;
+                
+                // Apply boundaries
+                newX = Math.max(0, Math.min(newX, frame.clientWidth - selectedObstacle.width));
+                newY = Math.max(0, Math.min(newY, frame.clientHeight - selectedObstacle.height));
+                
+                // Update position
+                selectedObstacle.x = newX;
+                selectedObstacle.y = newY;
+                
+                // Update DOM
+                updateObstaclePosition(selectedObstacle);
+            } else if (selectedBlock) {
+                // Calculate new position within frame boundaries
+                let newX = e.clientX - dragOffsetX - frameRect.left;
+                let newY = e.clientY - dragOffsetY - frameRect.top;
+                
+                // Apply boundaries
+                newX = Math.max(0, Math.min(newX, frame.clientWidth - selectedBlock.width));
+                newY = Math.max(0, Math.min(newY, frame.clientHeight - selectedBlock.height));
+                
+                // Update position
+                selectedBlock.x = newX;
+                selectedBlock.y = newY;
+                
+                // Update DOM
+                updateBlockPosition(selectedBlock);
+            } else if (selectedItem) {
+                // Calculate new position within frame boundaries
+                let newX = e.clientX - dragOffsetX - frameRect.left;
+                let newY = e.clientY - dragOffsetY - frameRect.top;
+                
+                // Apply boundaries
+                newX = Math.max(0, Math.min(newX, frame.clientWidth - selectedItem.size));
+                newY = Math.max(0, Math.min(newY, frame.clientHeight - selectedItem.size));
+                
+                // Update position
+                selectedItem.x = newX;
+                selectedItem.y = newY;
+                
+                // Update DOM
+                updateItemPosition(selectedItem);
+            } else if (selectedSquare) {
+                // Calculate new position within frame boundaries
+                let newX = e.clientX - dragOffsetX - frameRect.left;
+                let newY = e.clientY - dragOffsetY - frameRect.top;
+                
+                // Apply boundaries
+                newX = Math.max(0, Math.min(newX, frame.clientWidth - selectedSquare.width));
+                newY = Math.max(0, Math.min(newY, frame.clientHeight - selectedSquare.height));
+                
+                // Update position
+                selectedSquare.x = newX;
+                selectedSquare.y = newY;
+                
+                // Update DOM
+                updateSquarePosition(selectedSquare);
+            } else if (selectedWaypoint) {
+                // Calculate new position within frame boundaries
+                let newX = e.clientX - dragOffsetX - frameRect.left;
+                let newY = e.clientY - dragOffsetY - frameRect.top;
+                
+                // Apply boundaries
+                newX = Math.max(0, Math.min(newX, frame.clientWidth));
+                newY = Math.max(0, Math.min(newY, frame.clientHeight));
+                
+                // Update position
+                selectedWaypoint.x = newX;
+                selectedWaypoint.y = newY;
+                
+                // Update DOM element
+                selectedWaypoint.element.style.left = newX - 5 + 'px'; // -5 to center 10px element
+                selectedWaypoint.element.style.top = newY - 5 + 'px';
+                
+                // Update obstacle waypoints if this is for a specific obstacle
+                if (currentMovingObstacle) {
+                    const wpIndex = currentMovingObstacle.waypoints.findIndex(wp => 
+                        wp === selectedWaypoint || (wp.x === selectedWaypoint.x && wp.y === selectedWaypoint.y)
+                    );
+                    
+                    if (wpIndex > -1) {
+                        currentMovingObstacle.waypoints[wpIndex].x = newX;
+                        currentMovingObstacle.waypoints[wpIndex].y = newY;
+                    }
+                }
+                
+                // Update path indicator
+                updatePathIndicator();
+            }
+        });
+        
+        // Mouse up event to stop dragging
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+        
+        // Start pressure checker
+        function startPressureChecker() {
+            if (pressureCheckTimer) return;
+            
+            pressureCheckTimer = setInterval(() => {
+                checkSquareTrapped();
+            }, PRESSURE_CHECK_INTERVAL);
+        }
+        
+        // Stop pressure checker
+        function stopPressureChecker() {
+            if (pressureCheckTimer) {
+                clearInterval(pressureCheckTimer);
+                pressureCheckTimer = null;
+            }
+        }
+        
+        // Keyboard event handling
+        document.addEventListener('keydown', (e) => {
+            // Square selection with number keys
+            if (!isNaN(parseInt(e.key)) && parseInt(e.key) >= 1 && parseInt(e.key) <= 4) {
+                const index = parseInt(e.key) - 1;
+                const square = squareStates[index];
+                
+                // Skip if square is killed
+                if (square.isKilled) return;
+                
+                // Deselect any selected object
+                deselectAllObjects();
+                
+                // Select the square
+                selectedSquare = square;
+                selectedSquareIndex = index;
+                selectedSquare.element.classList.add('selected');
+                
+                // Show the spawn point for this square
+                spawnPoints.forEach((spawn, i) => {
+                    spawn.style.display = i === index ? 'block' : 'none';
+                });
+                
+                updateSelectionStatus();
+            }
+            
+            // Tab key to cycle through obstacles, blocks, and items
+            if (e.key === 'Tab') {
+                e.preventDefault(); // Prevent focus change
+                
+                // Combine all selectable objects
+                const selectableObjects = [
+                    ...obstacles.map(obj => ({ type: 'obstacle', object: obj })),
+                    ...blocks.map(obj => ({ type: 'block', object: obj })),
+                    ...items.map(obj => ({ type: 'item', object: obj })),
+                    ...squareStates.filter(sq => !sq.isKilled).map((obj, idx) => ({ type: 'square', object: obj, index: idx })),
+                    ...movingWaypoints.map(obj => ({ type: 'waypoint', object: obj }))
+                ];
+                
+                if (selectableObjects.length === 0) return;
+                
+                // Deselect current selection
+                deselectAllObjects();
+                
+                // Determine next object to select
+                let currentIndex = -1;
+                
+                if (selectedObstacle) {
+                    currentIndex = selectableObjects.findIndex(item => 
+                        item.type === 'obstacle' && item.object === selectedObstacle
+                    );
+                } else if (selectedBlock) {
+                    currentIndex = selectableObjects.findIndex(item => 
+                        item.type === 'block' && item.object === selectedBlock
+                    );
+                } else if (selectedItem) {
+                    currentIndex = selectableObjects.findIndex(item => 
+                        item.type === 'item' && item.object === selectedItem
+                    );
+                } else if (selectedSquare) {
+                    currentIndex = selectableObjects.findIndex(item => 
+                        item.type === 'square' && item.object === selectedSquare
+                    );
+                } else if (selectedWaypoint) {
+                    currentIndex = selectableObjects.findIndex(item => 
+                        item.type === 'waypoint' && item.object === selectedWaypoint
+                    );
+                }
+                
+                // Calculate next index
+                let nextIndex;
+                if (e.shiftKey) {
+                    // Go backwards with Shift+Tab
+                    nextIndex = currentIndex <= 0 ? selectableObjects.length - 1 : currentIndex - 1;
+                } else {
+                    // Go forwards with Tab
+                    nextIndex = (currentIndex + 1) % selectableObjects.length;
+                }
+                
+                // Select next object
+                const nextObj = selectableObjects[nextIndex];
+                
+                if (nextObj.type === 'obstacle') {
+                    selectedObstacle = nextObj.object;
+                    selectedObstacle.element.classList.add('selected');
+                    selectedObstacle.element.querySelector('.obstacle-delete').style.display = 'flex';
+                } else if (nextObj.type === 'block') {
+                    selectedBlock = nextObj.object;
+                    selectedBlock.element.classList.add('selected');
+                    selectedBlock.element.querySelector('.block-delete').style.display = 'flex';
+                } else if (nextObj.type === 'item') {
+                    selectedItem = nextObj.object;
+                    selectedItem.element.classList.add('selected');
+                    selectedItem.element.querySelector('.item-delete').style.display = 'flex';
+                } else if (nextObj.type === 'square') {
+                    selectedSquare = nextObj.object;
+                    selectedSquareIndex = nextObj.index;
+                    selectedSquare.element.classList.add('selected');
+                    
+                    // Show the spawn point for this square
+                    spawnPoints.forEach((spawn, i) => {
+                        spawn.style.display = i === nextObj.index ? 'block' : 'none';
+                    });
+                } else if (nextObj.type === 'waypoint') {
+                    selectedWaypoint = nextObj.object;
+                    selectedWaypoint.element.classList.add('selected');
+                    const deleteBtn = selectedWaypoint.element.querySelector('.waypoint-delete');
+                    if (deleteBtn) deleteBtn.style.display = 'flex';
+                }
+                
+                updateSelectionStatus();
+            }
+            
+            // Arrow keys for moving selected object
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                // Stop animation if it's running and a square is selected
+                if (animationId && selectedSquare) {
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
+                }
+                
+                // Calculate movement amount
+                let dx = 0;
+                let dy = 0;
+                
+                switch (e.key) {
+                    case 'ArrowLeft':
+                        dx = -0.1;
+                        break;
+                    case 'ArrowRight':
+                        dx = 0.1;
+                        break;
+                    case 'ArrowUp':
+                        dy = -0.1;
+                        break;
+                    case 'ArrowDown':
+                        dy = 0.1;
+                        break;
+                }
+                
+                // Apply movement speed
+                const speed = e.shiftKey ? MOVE_SPEED * 3 : MOVE_SPEED;
+                dx *= speed;
+                dy *= speed;
+                
+                // Apply movement to selected object
+                if (selectedObstacle) {
+                    // Calculate new position within frame boundaries
+                    let newX = selectedObstacle.x + dx;
+                    let newY = selectedObstacle.y + dy;
+                    
+                    // Apply boundaries
+                    newX = Math.max(0, Math.min(newX, frame.clientWidth - selectedObstacle.width));
+                    newY = Math.max(0, Math.min(newY, frame.clientHeight - selectedObstacle.height));
+                    
+                    // Update position
+                    selectedObstacle.x = newX;
+                    selectedObstacle.y = newY;
+                    
+                    // Update DOM
+                    updateObstaclePosition(selectedObstacle);
+                } else if (selectedBlock) {
+                    // Calculate new position within frame boundaries
+                    let newX = selectedBlock.x + dx;
+                    let newY = selectedBlock.y + dy;
+                    
+                    // Apply boundaries
+                    newX = Math.max(0, Math.min(newX, frame.clientWidth - selectedBlock.width));
+                    newY = Math.max(0, Math.min(newY, frame.clientHeight - selectedBlock.height));
+                    
+                    // Update position
+                    selectedBlock.x = newX;
+                    selectedBlock.y = newY;
+                    
+                    // Update DOM
+                    updateBlockPosition(selectedBlock);
+                } else if (selectedItem) {
+                    // Calculate new position within frame boundaries
+                    let newX = selectedItem.x + dx;
+                    let newY = selectedItem.y + dy;
+                    
+                    // Apply boundaries
+                    newX = Math.max(0, Math.min(newX, frame.clientWidth - selectedItem.size));
+                    newY = Math.max(0, Math.min(newY, frame.clientHeight - selectedItem.size));
+                    
+                    // Update position
+                    selectedItem.x = newX;
+                    selectedItem.y = newY;
+                    
+                    // Update DOM
+                    updateItemPosition(selectedItem);
+                } else if (selectedSquare) {
+                    // Calculate new position within frame boundaries
+                    let newX = selectedSquare.x + dx;
+                    let newY = selectedSquare.y + dy;
+                    
+                    // Apply boundaries
+                    newX = Math.max(0, Math.min(newX, frame.clientWidth - selectedSquare.width));
+                    newY = Math.max(0, Math.min(newY, frame.clientHeight - selectedSquare.height));
+                    
+                    // Update position
+                    selectedSquare.x = newX;
+                    selectedSquare.y = newY;
+                    
+                    // Update DOM
+                    updateSquarePosition(selectedSquare);
+                } else if (selectedWaypoint) {
+                    // Calculate new position within frame boundaries
+                    let newX = selectedWaypoint.x + dx;
+                    let newY = selectedWaypoint.y + dy;
+                    
+                    // Apply boundaries
+                    newX = Math.max(0, Math.min(newX, frame.clientWidth));
+                    newY = Math.max(0, Math.min(newY, frame.clientHeight));
+                    
+                    // Update position
+                    selectedWaypoint.x = newX;
+                    selectedWaypoint.y = newY;
+                    
+                    // Update DOM
+                    selectedWaypoint.element.style.left = newX - 5 + 'px';
+                    selectedWaypoint.element.style.top = newY - 5 + 'px';
+                    
+                    // Update obstacle waypoints if this is for a specific obstacle
+                    if (currentMovingObstacle) {
+                        const wpIndex = currentMovingObstacle.waypoints.findIndex(wp => 
+                            wp.x === selectedWaypoint.x && wp.y === selectedWaypoint.y
+                        );
+                        
+                        if (wpIndex > -1) {
+                            currentMovingObstacle.waypoints[wpIndex].x = newX;
+                            currentMovingObstacle.waypoints[wpIndex].y = newY;
+                        }
+                    }
+                    
+                    // Update path indicator
+                    updatePathIndicator();
+                }
+            }
+            
+            // Delete key to remove selected object
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (selectedObstacle) {
+                    // Remove from DOM
+                    selectedObstacle.element.remove();
+                    
+                    // Remove from array
+                    const index = obstacles.indexOf(selectedObstacle);
+                    if (index > -1) {
+                        obstacles.splice(index, 1);
+                    }
+                    
+                    // Clear selection
+                    selectedObstacle = null;
+                    updateSelectionStatus();
+                } else if (selectedBlock) {
+                    // Remove from DOM
+                    selectedBlock.element.remove();
+                    
+                    // Remove from array
+                    const index = blocks.indexOf(selectedBlock);
+                    if (index > -1) {
+                        blocks.splice(index, 1);
+                    }
+                    
+                    // Clear selection
+                    selectedBlock = null;
+                    updateSelectionStatus();
+                } else if (selectedItem) {
+                    // Remove from DOM
+                    selectedItem.element.remove();
+                    
+                    // Remove from array
+                    const index = items.indexOf(selectedItem);
+                    if (index > -1) {
+                        items.splice(index, 1);
+                    }
+                    
+                    // Clear selection
+                    selectedItem = null;
+                    updateSelectionStatus();
+                } else if (selectedWaypoint) {
+                    // Remove from DOM
+                    selectedWaypoint.element.remove();
+                    
+                    // Remove from array
+                    const wpIndex = movingWaypoints.indexOf(selectedWaypoint);
+                    if (wpIndex > -1) {
+                        movingWaypoints.splice(wpIndex, 1);
+                    }
+                    
+                    // Update obstacle waypoints if this is for a specific obstacle
+                    if (currentMovingObstacle) {
+                        const obstacleWpIndex = currentMovingObstacle.waypoints.findIndex(wp => 
+                            wp.x === selectedWaypoint.x && wp.y === selectedWaypoint.y
+                        );
+                        
+                        if (obstacleWpIndex > -1) {
+                            currentMovingObstacle.waypoints.splice(obstacleWpIndex, 1);
+                        }
+                    }
+                    
+                    // Clear selection
+                    selectedWaypoint = null;
+                    updateSelectionStatus();
+                    
+                    // Update path indicator
+                    updatePathIndicator();
+                }
+            }
+            
+            // S key to send square to spawn point
+            if (e.key === 's' || e.key === 'S') {
+                if (selectedSquare) {
+                    // Stop animation if it's running
+                    if (animationId) {
+                        cancelAnimationFrame(animationId);
+                        animationId = null;
+                    }
+                    
+                    // Move to spawn point
+                    selectedSquare.x = selectedSquare.spawnX;
+                    selectedSquare.y = selectedSquare.spawnY;
+                    
+                    // Update DOM
+                    updateSquarePosition(selectedSquare);
+                }
+            }
+
+            // R key to restart if game finished
+            if ((e.key === 'r' || e.key === 'R') && isGameFinished) {
+                // Hide finish message
+                finishMessage.style.display = 'none';
+                isGameFinished = false;
+                
+                // Reset and restart
+                initializeSquares();
+                animate();
+            }
+        });
+        
+        // Prevent the default wheel behavior only when mouse is over a selected object
+        document.addEventListener('wheel', (e) => {
+            // Allow normal scrolling if not over a selected object
+            if (!selectedObstacle && !selectedBlock && !selectedItem && !selectedSquare && !selectedWaypoint) return;
+            
+            // Find the top-level element under the mouse
+            const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
+            
+            // Check if it's a selected object
+            if ((selectedObstacle && elementUnderMouse === selectedObstacle.element) ||
+                (selectedBlock && elementUnderMouse === selectedBlock.element) ||
+                (selectedItem && elementUnderMouse === selectedItem.element) ||
+                (selectedSquare && elementUnderMouse === selectedSquare.element) ||
+                (selectedWaypoint && elementUnderMouse === selectedWaypoint.element)) {
+                // Prevent scrolling when over selected objects
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // Event listeners for buttons
+        startBtn.addEventListener('click', () => {
+            if (!animationId && !isGameFinished) {
+                
+                animate();
+                startPressureChecker();
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+                stopPressureChecker();
+            }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+                stopPressureChecker();
+            }
+            initializeSquares();
+        });
+
+        // Add obstacle button handler
+        addObstacleBtn.addEventListener('click', () => {
+            // Toggle add obstacle mode
+            isAddingObstacle = !isAddingObstacle;
+            
+            // If enabling, disable other add modes
+            if (isAddingObstacle) {
+                isAddingBlock = false;
+                isAddingItem = false;
+                addBlockBtn.classList.remove('active');
+                addItemBtn.classList.remove('active');
+                blockOptions.style.display = 'none';
+                itemOptions.style.display = 'none';
+            }
+            
+            // Update UI
+            addObstacleBtn.classList.toggle('active', isAddingObstacle);
+            obstacleOptions.style.display = isAddingObstacle ? 'flex' : 'none';
+            
+            // Hide moving options if we're not adding a moving obstacle
+            if (isAddingObstacle && currentObstacleType !== 'moving') {
+                movingObstacleOptions.style.display = 'none';
+            } else if (isAddingObstacle && currentObstacleType === 'moving') {
+                movingObstacleOptions.style.display = 'flex';
+            }
+            
+            // Deselect any selected object when entering add obstacle mode
+            if (isAddingObstacle) {
+                deselectAllObjects();
+            }
+        });
+
+        // Add block button handler
+        addBlockBtn.addEventListener('click', () => {
+            // Toggle add block mode
+            isAddingBlock = !isAddingBlock;
+            
+            // If enabling, disable other add modes
+            if (isAddingBlock) {
+                isAddingObstacle = false;
+                isAddingItem = false;
+                addObstacleBtn.classList.remove('active');
+                addItemBtn.classList.remove('active');
+                obstacleOptions.style.display = 'none';
+                itemOptions.style.display = 'none';
+                movingObstacleOptions.style.display = 'none';
+            }
+            
+            // Update UI
+            addBlockBtn.classList.toggle('active', isAddingBlock);
+            blockOptions.style.display = isAddingBlock ? 'flex' : 'none';
+            
+            // Deselect any selected object when entering add block mode
+            if (isAddingBlock) {
+                deselectAllObjects();
+                
+                // Clear waypoints if any were being set
+                if (isSettingWaypoints) {
+                    // Clear waypoints
+                    movingWaypoints.forEach(wp => wp.element.remove());
+                    movingWaypoints = [];
+                    
+                    // Clear path indicator
+                    if (pathIndicator) {
+                        pathIndicator.remove();
+                        pathIndicator = null;
+                    }
+                    
+                    isSettingWaypoints = false;
+                    currentMovingObstacle = null;
+                }
+            }
+        });
+
+        // Add item button handler
+        addItemBtn.addEventListener('click', () => {
+            // Toggle add item mode
+            isAddingItem = !isAddingItem;
+            
+            // If enabling, disable other add modes
+            if (isAddingItem) {
+                isAddingObstacle = false;
+                isAddingBlock = false;
+                addObstacleBtn.classList.remove('active');
+                addBlockBtn.classList.remove('active');
+                obstacleOptions.style.display = 'none';
+                blockOptions.style.display = 'none';
+                movingObstacleOptions.style.display = 'none';
+            }
+            
+            // Update UI
+            addItemBtn.classList.toggle('active', isAddingItem);
+            itemOptions.style.display = isAddingItem ? 'flex' : 'none';
+            
+            // Deselect any selected object when entering add item mode
+            if (isAddingItem) {
+                deselectAllObjects();
+                
+                // Clear waypoints if any were being set
+                if (isSettingWaypoints) {
+                    // Clear waypoints
+                    movingWaypoints.forEach(wp => wp.element.remove());
+                    movingWaypoints = [];
+                    
+                    // Clear path indicator
+                    if (pathIndicator) {
+                        pathIndicator.remove();
+                        pathIndicator = null;
+                    }
+                    
+                    isSettingWaypoints = false;
+                    currentMovingObstacle = null;
+                }
+            }
+        });
+
+        // Clear all button handler
+        clearAllBtn.addEventListener('click', () => {
+            // Ask for confirmation
+            if (confirm('Are you sure you want to clear all obstacles, blocks, and items?')) {
+                // Clear obstacles
+                obstacles.forEach(obstacle => obstacle.element.remove());
+                obstacles = [];
+                
+                // Clear blocks
+                blocks.forEach(block => block.element.remove());
+                blocks = [];
+
+                // Clear items
+                items.forEach(item => item.element.remove());
+                items = [];
+                
+                // Clear waypoints
+                movingWaypoints.forEach(wp => wp.element.remove());
+                movingWaypoints = [];
+                
+                // Clear path indicator
+                if (pathIndicator) {
+                    pathIndicator.remove();
+                    pathIndicator = null;
+                }
+                
+                // Reset state
+                isSettingWaypoints = false;
+                currentMovingObstacle = null;
+                
+                // Reset selection
+                deselectAllObjects();
+                updateSelectionStatus();
+            }
+        });
+
+        // Obstacle type button handlers
+        normalObstacleBtn.addEventListener('click', () => {
+            currentObstacleType = 'normal';
+            normalObstacleBtn.classList.add('active');
+            breakableObstacleBtn.classList.remove('active');
+            movingObstacleBtn.classList.remove('active');
+            
+            // Hide breakable options
+            breakableOptionDiv.style.display = 'none';
+            
+            // Hide moving options
+            movingObstacleOptions.style.display = 'none';
+            
+            // Clear waypoints if any were being set
+            if (isSettingWaypoints) {
+                // Clear waypoints
+                movingWaypoints.forEach(wp => wp.element.remove());
+                movingWaypoints = [];
+                
+                // Clear path indicator
+                if (pathIndicator) {
+                    pathIndicator.remove();
+                    pathIndicator = null;
+                }
+                
+                isSettingWaypoints = false;
+                currentMovingObstacle = null;
+            }
+        });
+
+        breakableObstacleBtn.addEventListener('click', () => {
+            currentObstacleType = 'breakable';
+            normalObstacleBtn.classList.remove('active');
+            breakableObstacleBtn.classList.add('active');
+            movingObstacleBtn.classList.remove('active');
+            
+            // Show breakable options
+            breakableOptionDiv.style.display = 'block';
+            
+            // Hide moving options
+            movingObstacleOptions.style.display = 'none';
+            
+            // Clear waypoints if any were being set
+            if (isSettingWaypoints) {
+                // Clear waypoints
+                movingWaypoints.forEach(wp => wp.element.remove());
+                movingWaypoints = [];
+                
+                // Clear path indicator
+                if (pathIndicator) {
+                    pathIndicator.remove();
+                    pathIndicator = null;
+                }
+                
+                isSettingWaypoints = false;
+                currentMovingObstacle = null;
+            }
+        });
+
+        movingObstacleBtn.addEventListener('click', () => {
+            currentObstacleType = 'moving';
+            normalObstacleBtn.classList.remove('active');
+            breakableObstacleBtn.classList.remove('active');
+            movingObstacleBtn.classList.add('active');
+            
+            // Hide breakable options
+            breakableOptionDiv.style.display = 'none';
+            
+            // Show moving options
+            movingObstacleOptions.style.display = 'flex';
+        });
+
+        // Movement type handler
+        movementTypeInput.addEventListener('change', () => {
+            currentMovementType = movementTypeInput.value;
+            
+            // Update path indicator if waypoints exist
+            if (movingWaypoints.length > 0) {
+                updatePathIndicator();
+            }
+            
+            // Update current obstacle if one is being configured
+            if (currentMovingObstacle) {
+                currentMovingObstacle.movementType = currentMovementType;
+            }
+        });
+
+        // Moving speed handler
+        movingSpeedInput.addEventListener('input', () => {
+            // Update current obstacle if one is being configured
+            if (currentMovingObstacle) {
+                currentMovingObstacle.speed = parseInt(movingSpeedInput.value) || 3;
+            }
+        });
+        
+        // Square size control buttons
+        normalSizeBtn.addEventListener('click', () => {
+            squareSize = NORMAL_SQUARE_SIZE;
+            normalSizeBtn.classList.add('active');
+            smallSizeBtn.classList.remove('active');
+            
+            // Update all squares
+            squareStates.forEach(state => {
+                if (!state.isExploding && !state.isKilled) {
+                    state.isSmall = false;
+                    state.width = NORMAL_SQUARE_SIZE;
+                    state.height = NORMAL_SQUARE_SIZE;
+                    state.element.classList.remove('small');
+                    updateSquareSize(state);
+                }
+            });
+            
+            // Update spawn points
+            spawnPoints.forEach(spawn => {
+                spawn.style.width = NORMAL_SQUARE_SIZE + 'px';
+                spawn.style.height = NORMAL_SQUARE_SIZE + 'px';
+            });
+        });
+
+        smallSizeBtn.addEventListener('click', () => {
+            squareSize = SMALL_SQUARE_SIZE;
+            normalSizeBtn.classList.remove('active');
+            smallSizeBtn.classList.add('active');
+            
+            // Update all squares
+            squareStates.forEach(state => {
+                if (!state.isExploding && !state.isKilled) {
+                    state.isSmall = true;
+                    state.width = SMALL_SQUARE_SIZE;
+                    state.height = SMALL_SQUARE_SIZE;
+                    state.element.classList.add('small');
+                    updateSquareSize(state);
+                }
+            });
+            
+            // Update spawn points
+            spawnPoints.forEach(spawn => {
+                spawn.style.width = SMALL_SQUARE_SIZE + 'px';
+                spawn.style.height = SMALL_SQUARE_SIZE + 'px';
+            });
+        });
+
+        // Block type buttons
+        teleporterBtn.addEventListener('click', () => {
+            currentBlockType = 'teleporter';
+            teleporterBtn.classList.add('active');
+            killerBtn.classList.remove('active');
+            transformerBtn.classList.remove('active');
+            finishlineBtn.classList.remove('active');
+        });
+
+        killerBtn.addEventListener('click', () => {
+            currentBlockType = 'killer';
+            teleporterBtn.classList.remove('active');
+            killerBtn.classList.add('active');
+            transformerBtn.classList.remove('active');
+            finishlineBtn.classList.remove('active');
+        });
+
+        transformerBtn.addEventListener('click', () => {
+            currentBlockType = 'transformer';
+            teleporterBtn.classList.remove('active');
+            killerBtn.classList.remove('active');
+            transformerBtn.classList.add('active');
+            finishlineBtn.classList.remove('active');
+        });
+
+        finishlineBtn.addEventListener('click', () => {
+            currentBlockType = 'finishline';
+            teleporterBtn.classList.remove('active');
+            killerBtn.classList.remove('active');
+            transformerBtn.classList.remove('active');
+            finishlineBtn.classList.add('active');
+        });
+
+        // Add missing click handler for knife button
+        knifeBtn.addEventListener('click', () => {
+            currentItemType = 'knife';
+            knifeBtn.classList.add('active');
+        });
+
+        // Frame click event for adding obstacles, blocks, items, or waypoints
+        frame.addEventListener('click', (e) => {
+            const frameRect = frame.getBoundingClientRect();
+            const x = e.clientX - frameRect.left;
+            const y = e.clientY - frameRect.top;
+            
+            if (isAddingObstacle) {
+                if (currentObstacleType === 'normal') {
+                    createObstacle(x, y);
+                } else if (currentObstacleType === 'breakable') {
+                    createBreakableObstacle(x, y);
+                } else if (currentObstacleType === 'moving') {
+                    if (!isSettingWaypoints) {
+                        // Create the moving obstacle first
+                        const newObstacle = createMovingObstacle(x, y);
+                        currentMovingObstacle = newObstacle;
+                        
+                        // Start setting waypoints
+                        isSettingWaypoints = true;
+                        
+                        // Clear existing waypoints
+                        movingWaypoints = [];
+                    } else {
+                        // Add waypoint for the existing moving obstacle
+                        createWaypoint(x, y);
+                        
+                        // If we have enough waypoints, finalize the obstacle setup
+                        if (movingWaypoints.length >= 2) {
+                            // Set waypoints on the obstacle
+                            currentMovingObstacle.waypoints = movingWaypoints.slice();
+                            
+                            // Hide the waypoints after setup
+                            movingWaypoints.forEach(wp => {
+                                wp.element.style.display = 'none';
+                            });
+                            
+                            // Reset state
+                            isSettingWaypoints = false;
+                            currentMovingObstacle = null;
+                            
+                            // Clear path indicator (it's no longer needed after setup)
+                            if (pathIndicator) {
+                                pathIndicator.remove();
+                                pathIndicator = null;
+                            }
+                            
+                            // Reset waypoints array for next obstacle
+                            movingWaypoints = [];
+                        }
+                    }
+                }
+            } else if (isAddingBlock) {
+                createBlock(x, y, currentBlockType);
+            } else if (isAddingItem) {
+                const itemSize = parseInt(itemSizeInput.value) || KNIFE_SIZE;
+                createItem(x - itemSize/2, y - itemSize/2, currentItemType, itemSize);
+            }
+        });
+
+        // Make initial obstacle interactive
+        setupObstacleInteraction(initialObstacle, obstacles[0]);
+        
+        // Setup square interaction
+        squareStates.forEach((state, index) => {
+            setupSquareInteraction(state.element, state, index);
+        });
+
+        // Initialize the game - ensure squares are at their spawn points
+        initializeSquares();
+        
+        // Make sure to move squares to their spawn positions initially
+        moveSquaresToSpawn();
+    </script>
+</body>
+</html>
